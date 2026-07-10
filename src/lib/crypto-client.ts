@@ -22,10 +22,14 @@
 // Constantes criptográficas
 // ---------------------------------------------------------------------------
 export const KDF_ITERATIONS = 600_000; // OWASP 2023 recomendado para PBKDF2-SHA256
-export const SALT_LENGTH = 16; // 128 bits
+export const KDF_ITERATIONS_MIN = 310_000; // mínimo server-side (post-2024)
+export const KDF_ITERATIONS_MAX = 1_000_000; // máximo server-side (anti-DoS)
+export const SALT_LENGTH = 16; // 128 bits — mínimo absoluto
 export const IV_LENGTH = 12; // 96 bits (recomendado GCM)
 export const RSA_MODULUS = 2048;
 export const AES_KEY_LENGTH = 256;
+export const MAX_BLOB_BYTES = 64 * 1024; // 64 KiB — anti-DoS para blobs cifrados
+export const MAX_JWK_BYTES = 4 * 1024; // 4 KiB — una JWK RSA-2048 ocupa ~1.2 KiB
 
 // ---------------------------------------------------------------------------
 // Helpers de serialización (base64 <-> ArrayBuffer)
@@ -54,6 +58,48 @@ export function randomBytes(length: number): Uint8Array {
   return arr;
 }
 
+/**
+ * Normaliza una contraseña a Unicode NFC antes de cualquier derivación.
+ * Evita que el mismo password en forma NFC vs NFD produzca llaves maestras
+ * distintas, lo que bloquearía al usuario fuera de su bóveda sin razón
+ * aparente. NFC es la forma preferida por W3C.
+ */
+export function normalizePassword(password: string): string {
+  return password.normalize("NFC");
+}
+
+/**
+ * Canonicaliza una JWK para que su hash sea determinista independientemente
+ * del orden de claves o de espacios en blanco. Devuelve un JSON con claves
+ * ordenadas alfabéticamente y sin espacios.
+ */
+export function canonicalJwkString(jwk: JsonWebKey): string {
+  const sorted: Record<string, unknown> = {};
+  for (const k of Object.keys(jwk).sort()) {
+    sorted[k] = (jwk as Record<string, unknown>)[k];
+  }
+  return JSON.stringify(sorted);
+}
+
+/**
+ * Huella criptográfica de una llave pública (SHA-256 del JWK canonizado).
+ * Se usa para:
+ *  - TOFU: el cliente muestra esta huella al compartir, el owner la verifica
+ *    fuera de banda con el destinatario.
+ *  - Detección de sustitución: si la huella cambia entre dos lookups,
+ *    el cliente alerta al usuario.
+ */
+export async function publicKeyFingerprint(jwk: JsonWebKey): Promise<string> {
+  const canon = canonicalJwkString(jwk);
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canon));
+  const bytes = new Uint8Array(hash);
+  let hex = "";
+  for (let i = 0; i < bytes.length; i++) {
+    hex += bytes[i].toString(16).padStart(2, "0");
+  }
+  return hex;
+}
+
 // ---------------------------------------------------------------------------
 // 1. KDF — Derivar llave maestra desde contraseña + salt
 // ---------------------------------------------------------------------------
@@ -69,16 +115,19 @@ export async function deriveMasterKey(
   salt: Uint8Array,
   iterations: number = KDF_ITERATIONS,
 ): Promise<CryptoKey> {
-  // 1. Importar password como llave raw
+  // 1. Normalizar Unicode NFC — evita bloqueos por diferencias NFC/NFD
+  const normalized = normalizePassword(password);
+
+  // 2. Importar password como llave raw
   const passwordKey = await crypto.subtle.importKey(
     "raw",
-    new TextEncoder().encode(password),
+    new TextEncoder().encode(normalized),
     { name: "PBKDF2" },
     false,
     ["deriveKey"],
   );
 
-  // 2. Derivar llave AES-256-GCM no extraíble
+  // 3. Derivar llave AES-256-GCM no extraíble
   return crypto.subtle.deriveKey(
     {
       name: "PBKDF2",
@@ -123,7 +172,9 @@ export async function aesDecrypt(
 }
 
 // ---------------------------------------------------------------------------
-// 3. RSA-OAEP — Generación de par asimétrico para compartir secretos
+// 3. RSA-OAEP + RSA-PSS — Par asimétrico dual-purpose
+//    - RSA-OAEP: cifrado / wrapping de llaves AES
+//    - RSA-PSS:  firma de prueba-de-posesión (PoP) en el registro
 // ---------------------------------------------------------------------------
 export async function generateRsaKeyPair(): Promise<CryptoKeyPair> {
   return crypto.subtle.generateKey(
@@ -136,7 +187,8 @@ export async function generateRsaKeyPair(): Promise<CryptoKeyPair> {
     true, // extraíble: necesitamos exportar la llave privada para cifrarla
     // Importante: declarar TODOS los usos que usaremos después al importar
     // para que el campo `key_ops` de la JWK exportada sea compatible.
-    ["encrypt", "decrypt", "wrapKey", "unwrapKey"],
+    // Incluimos sign/verify para RSA-PSS (proof-of-possession en registro).
+    ["encrypt", "decrypt", "wrapKey", "unwrapKey", "sign", "verify"],
   );
 }
 
@@ -162,9 +214,10 @@ export async function importPublicKeyJwk(jwk: JsonWebKey): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     "jwk",
     sanitizeJwk(jwk),
-    { name: "RSA-OAEP", hash: "SHA-256" },
+    // Multi-algorithm: RSA-OAEP para wrapping, RSA-PSS para verificación PoP.
+    [{ name: "RSA-OAEP", hash: "SHA-256" }, { name: "RSA-PSS", hash: "SHA-256" }],
     true,
-    ["encrypt", "wrapKey"],
+    ["encrypt", "wrapKey", "verify"],
   );
 }
 
@@ -172,9 +225,11 @@ export async function importPrivateKeyJwk(jwk: JsonWebKey): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     "jwk",
     sanitizeJwk(jwk),
-    { name: "RSA-OAEP", hash: "SHA-256" },
+    // Multi-algorithm: la misma llave RSA sirve para RSA-OAEP (decrypt/unwrap)
+    // y RSA-PSS (sign). Web Crypto permite declarar ambos algoritmos en importKey.
+    [{ name: "RSA-OAEP", hash: "SHA-256" }, { name: "RSA-PSS", hash: "SHA-256" }],
     false, // no extraíble: la llave privada en memoria no debe poder exportarse de nuevo
-    ["decrypt", "unwrapKey"],
+    ["decrypt", "unwrapKey", "sign"],
   );
 }
 
@@ -204,6 +259,70 @@ export async function decryptPrivateKey(
   const jwkStr = await aesDecrypt(masterKey, encryptedJwkB64, ivB64);
   const jwk = JSON.parse(jwkStr) as JsonWebKey;
   return importPrivateKeyJwk(jwk);
+}
+
+// ---------------------------------------------------------------------------
+// 4.b Proof-of-Possession (PoP) — firma RSA-PSS que demuestra que el
+//     cliente realmente posee la privateKey correspondiente a la publicKey
+//     que está registrando. El servidor verifica esta firma antes de
+//     aceptar el registro, previniendo sustitución de publicKey.
+// ---------------------------------------------------------------------------
+/**
+ * Construye el mensaje canónico que se firma para PoP.
+ * Incluye email + fingerprint + kdfSalt para vincular la identidad del
+ * usuario con su par de llaves y su salt de derivación.
+ */
+export function buildPopMessage(
+  email: string,
+  fingerprintHex: string,
+  kdfSaltB64: string,
+): Uint8Array {
+  // Formato determinista: campo=valor separados por \n
+  const msg = `zk-vault-pop-v1\nemail=${email}\nfingerprint=${fingerprintHex}\nsalt=${kdfSaltB64}`;
+  return new TextEncoder().encode(msg);
+}
+
+/**
+ * Firma el mensaje PoP con RSA-PSS (salt length = 32 bytes).
+ * Devuelve la firma en base64.
+ */
+export async function signPop(
+  privateKey: CryptoKey,
+  email: string,
+  fingerprintHex: string,
+  kdfSaltB64: string,
+): Promise<string> {
+  const msg = buildPopMessage(email, fingerprintHex, kdfSaltB64);
+  const sig = await crypto.subtle.sign(
+    { name: "RSA-PSS", saltLength: 32 },
+    privateKey,
+    msg as BufferSource,
+  );
+  return bufToBase64(sig);
+}
+
+/**
+ * Verifica una firma PoP con la publicKey declarada.
+ * Usado por el servidor en /api/auth/register.
+ */
+export async function verifyPop(
+  publicKey: CryptoKey,
+  signatureB64: string,
+  email: string,
+  fingerprintHex: string,
+  kdfSaltB64: string,
+): Promise<boolean> {
+  try {
+    const msg = buildPopMessage(email, fingerprintHex, kdfSaltB64);
+    return crypto.subtle.verify(
+      { name: "RSA-PSS", saltLength: 32 },
+      publicKey,
+      base64ToBuf(signatureB64) as BufferSource,
+      msg as BufferSource,
+    );
+  } catch {
+    return false;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -275,7 +394,9 @@ export interface RegistrationArtifacts {
   kdfSalt: string;
   kdfIterations: number;
   publicKeyJwk: JsonWebKey;
+  publicKeyFingerprint: string; // hex SHA-256 — para TOFU
   encryptedPrivateKey: EncryptedPrivateKey;
+  popSignature: string; // base64 RSA-PSS — prueba de posesión
   // En memoria (NO se envían al servidor):
   masterKey: CryptoKey;
   privateKey: CryptoKey;
@@ -289,10 +410,10 @@ export async function performRegistration(
   // 1. Salt aleatorio
   const salt = randomBytes(SALT_LENGTH);
 
-  // 2. Derivar llave maestra (PBKDF2)
+  // 2. Derivar llave maestra (PBKDF2) con password normalizado NFC
   const masterKey = await deriveMasterKey(password, salt);
 
-  // 3. Generar par RSA-OAEP
+  // 3. Generar par RSA-OAEP + RSA-PSS
   const rsaPair = await generateRsaKeyPair();
 
   // 4. Cifrar llave privada con llave maestra (AES-256-GCM)
@@ -301,11 +422,22 @@ export async function performRegistration(
   // 5. Exportar llave pública (en claro, es pública)
   const publicKeyJwk = await exportPublicKeyJwk(rsaPair.publicKey);
 
+  // 6. Calcular fingerprint de la publicKey para TOFU
+  const kdfSaltB64 = bufToBase64(salt);
+  const fingerprint = await publicKeyFingerprint(publicKeyJwk);
+
+  // 7. Firma PoP: demuestra que poseemos la privateKey correspondiente
+  //    a la publicKey que estamos registrando. El servidor verificará
+  //    esta firma ANTES de almacenar nada.
+  const popSignature = await signPop(rsaPair.privateKey, email, fingerprint, kdfSaltB64);
+
   return {
-    kdfSalt: bufToBase64(salt),
+    kdfSalt: kdfSaltB64,
     kdfIterations: KDF_ITERATIONS,
     publicKeyJwk,
+    publicKeyFingerprint: fingerprint,
     encryptedPrivateKey,
+    popSignature,
     masterKey,
     privateKey: rsaPair.privateKey,
     publicKey: rsaPair.publicKey,

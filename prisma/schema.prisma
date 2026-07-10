@@ -47,10 +47,15 @@ model UserKeyMaterial {
   kdfSalt                String   // base64, público
   kdfIterations          Int      // público
   publicKeyJwk           String   // JSON string, público
+  publicKeyFingerprint   String   // hex SHA-256 del JWK canonizado — para TOFU y detección de sustitución
+  popSignature           String   // base64 — firma RSA-PSS de {email, publicKeyFingerprint, kdfSalt} con la privateKey
+  popSignatureHash       String   // "SHA-256" — algoritmo usado para la firma PoP (auditabilidad)
   encryptedPrivateKeyJwk String   // base64, AES-256-GCM ciphertext
   privateKeyIv           String   // base64, público
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
+
+  @@index([publicKeyFingerprint])
 }
 
 // ---------------------------------------------------------------------
