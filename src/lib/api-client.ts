@@ -46,5 +46,25 @@ export function useApi() {
     return res;
   }
 
-  return { apiFetch };
+  /**
+   * Logout server-side real: revoca el token en Redis blacklist.
+   * Luego limpia el estado local.
+   */
+  async function serverLogout(): Promise<void> {
+    const state = useSession.getState();
+    const sessionToken = state.sessionToken;
+    if (sessionToken) {
+      try {
+        await fetch("/api/auth/logout", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${sessionToken}` },
+        });
+      } catch {
+        // Si el server no responde, igualmente limpiamos local
+      }
+    }
+    logout();
+  }
+
+  return { apiFetch, serverLogout };
 }

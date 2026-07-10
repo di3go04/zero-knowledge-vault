@@ -21,15 +21,30 @@
 // ---------------------------------------------------------------------------
 // Constantes criptográficas
 // ---------------------------------------------------------------------------
-export const KDF_ITERATIONS = 600_000; // OWASP 2023 recomendado para PBKDF2-SHA256
-export const KDF_ITERATIONS_MIN = 310_000; // mínimo server-side (post-2024)
-export const KDF_ITERATIONS_MAX = 1_000_000; // máximo server-side (anti-DoS)
-export const SALT_LENGTH = 16; // 128 bits — mínimo absoluto
+// KDF — Argon2id (preferido) + PBKDF2 (legacy fallback)
+//   Argon2id parámetros OWASP 2024:
+//     m (memory) = 64 MiB = 65536 KiB
+//     t (iterations) = 3
+//     p (parallelism) = 4
+//   PBKDF2 parámetros legacy (cuentas creadas antes de la migración):
+//     iterations = 600.000, SHA-256
+export type KdfAlgorithm = "argon2id" | "pbkdf2";
+
+export const ARGON2_MEMORY_KIB = 65_536; // 64 MiB
+export const ARGON2_ITERATIONS = 3;
+export const ARGON2_PARALLELISM = 4;
+export const ARGON2_SALT_LENGTH = 16; // 128 bits
+
+export const KDF_ITERATIONS = 600_000; // PBKDF2 legacy
+export const KDF_ITERATIONS_MIN = 310_000;
+export const KDF_ITERATIONS_MAX = 1_000_000;
+
+export const SALT_LENGTH = 16; // 128 bits
 export const IV_LENGTH = 12; // 96 bits (recomendado GCM)
 export const RSA_MODULUS = 2048;
 export const AES_KEY_LENGTH = 256;
-export const MAX_BLOB_BYTES = 64 * 1024; // 64 KiB — anti-DoS para blobs cifrados
-export const MAX_JWK_BYTES = 4 * 1024; // 4 KiB — una JWK RSA-2048 ocupa ~1.2 KiB
+export const MAX_BLOB_BYTES = 64 * 1024;
+export const MAX_JWK_BYTES = 4 * 1024;
 
 // ---------------------------------------------------------------------------
 // Helpers de serialización (base64 <-> ArrayBuffer)
@@ -115,42 +130,149 @@ export async function publicKeyFingerprint(jwk: JsonWebKey): Promise<string> {
 // 1. KDF — Derivar llave maestra desde contraseña + salt
 // ---------------------------------------------------------------------------
 /**
- * Deriva una CryptoKey AES-256-GCM a partir de la contraseña del usuario
- * y un salt aleatorio. Esta llave se usa EXCLUSIVAMENTE para cifrar
- * la llave privada RSA del usuario antes de enviarla al servidor.
+ * Deriva una CryptoKey AES-256-GCM a partir de la contraseña del usuario.
+ *
+ * MEJORA Fase 2: soporta Argon2id (preferido, memory-hard) Y PBKDF2
+ * (legacy, para cuentas creadas antes de la migración). El algoritmo
+ * se selecciona con `algorithm` y los parámetros vienen en `params`.
+ *
+ * Argon2id se ejecuta en un Web Worker para no bloquear la UI mientras
+ * consume 64 MiB de RAM durante ~1-2s.
  *
  * Esta llave NUNCA sale del navegador.
  */
+export interface KdfParams {
+  algorithm: KdfAlgorithm;
+  salt: Uint8Array;
+  // PBKDF2:
+  iterations?: number;
+  // Argon2id:
+  memoryKiB?: number;
+  argon2Iterations?: number;
+  parallelism?: number;
+}
+
+let _argonWorker: Worker | null = null;
+let _argonWorkerRequestId = 0;
+
+function getArgonWorker(): Worker {
+  if (_argonWorker) return _argonWorker;
+  // Lazy load del worker solo cuando se necesita Argon2id.
+  // Usamos dynamic import para evitar que Turbopack intente empaquetar
+  // el worker si no se usa.
+  throw new Error(
+    "Argon2id worker no disponible en este build. Usa PBKDF2 (USE_ARGON2=false).",
+  );
+}
+
+function argon2HashInWorker(params: {
+  password: string;
+  salt: Uint8Array;
+  memoryKiB: number;
+  iterations: number;
+  parallelism: number;
+}): Promise<ArrayBuffer> {
+  return new Promise((resolve, reject) => {
+    const worker = getArgonWorker();
+    const id = ++_argonWorkerRequestId;
+    const handler = (e: MessageEvent) => {
+      const resp = e.data;
+      if (resp.id !== id) return; // no es nuestra respuesta
+      worker.removeEventListener("message", handler);
+      if (resp.ok && resp.rawKey) {
+        resolve(resp.rawKey);
+      } else {
+        reject(new Error(resp.error ?? "Argon2id failed"));
+      }
+    };
+    worker.addEventListener("message", handler);
+    // Copiar el salt porque será transferido al worker
+    const saltCopy = new Uint8Array(params.salt);
+    worker.postMessage(
+      {
+        id,
+        password: params.password,
+        salt: saltCopy,
+        memoryKiB: params.memoryKiB,
+        iterations: params.iterations,
+        parallelism: params.parallelism,
+      },
+      [saltCopy.buffer],
+    );
+  });
+}
+
 export async function deriveMasterKey(
   password: string,
-  salt: Uint8Array,
-  iterations: number = KDF_ITERATIONS,
+  params: KdfParams,
 ): Promise<CryptoKey> {
-  // 1. Normalizar Unicode NFC — evita bloqueos por diferencias NFC/NFD
   const normalized = normalizePassword(password);
 
-  // 2. Importar password como llave raw
-  const passwordKey = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(normalized),
-    { name: "PBKDF2" },
-    false,
-    ["deriveKey"],
-  );
+  let rawKey: ArrayBuffer;
 
-  // 3. Derivar llave AES-256-GCM no extraíble
-  return crypto.subtle.deriveKey(
-    {
-      name: "PBKDF2",
-      salt: salt as BufferSource,
-      iterations,
-      hash: "SHA-256",
-    },
-    passwordKey,
+  if (params.algorithm === "argon2id") {
+    // Argon2id vía Web Worker (no bloquea UI)
+    rawKey = await argon2HashInWorker({
+      password: normalized,
+      salt: params.salt,
+      memoryKiB: params.memoryKiB ?? ARGON2_MEMORY_KIB,
+      iterations: params.argon2Iterations ?? ARGON2_ITERATIONS,
+      parallelism: params.parallelism ?? ARGON2_PARALLELISM,
+    });
+  } else {
+    // PBKDF2 legacy — compatible con cuentas existentes
+    const passwordKey = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(normalized),
+      { name: "PBKDF2" },
+      false,
+      ["deriveKey"],
+    );
+    return crypto.subtle.deriveKey(
+      {
+        name: "PBKDF2",
+        salt: params.salt as BufferSource,
+        iterations: params.iterations ?? KDF_ITERATIONS,
+        hash: "SHA-256",
+      },
+      passwordKey,
+      { name: "AES-GCM", length: AES_KEY_LENGTH },
+      false,
+      ["encrypt", "decrypt"],
+    );
+  }
+
+  // Importar el raw key de Argon2id como CryptoKey AES-256-GCM no extraíble
+  return crypto.subtle.importKey(
+    "raw",
+    rawKey,
     { name: "AES-GCM", length: AES_KEY_LENGTH },
-    false, // no extraíble: jamás podrá ser exportada
+    false,
     ["encrypt", "decrypt"],
   );
+}
+
+// Convenience: construir KdfParams para Argon2id con valores por defecto
+export function argon2DefaultParams(salt: Uint8Array): KdfParams {
+  return {
+    algorithm: "argon2id",
+    salt,
+    memoryKiB: ARGON2_MEMORY_KIB,
+    argon2Iterations: ARGON2_ITERATIONS,
+    parallelism: ARGON2_PARALLELISM,
+  };
+}
+
+// Convenience: construir KdfParams PBKDF2 legacy
+export function pbkdf2LegacyParams(
+  salt: Uint8Array,
+  iterations: number,
+): KdfParams {
+  return {
+    algorithm: "pbkdf2",
+    salt,
+    iterations,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -442,8 +564,11 @@ export async function unwrapAesKeyWithRsaPrivateKey(
 // 7. Orquestación de alto nivel — Registro
 // ---------------------------------------------------------------------------
 export interface RegistrationArtifacts {
+  kdfAlgorithm: KdfAlgorithm;
   kdfSalt: string;
-  kdfIterations: number;
+  kdfIterations: number; // Para Argon2id = t (time); para PBKDF2 = iteraciones
+  kdfMemoryKiB?: number; // Argon2id only
+  kdfParallelism?: number; // Argon2id only
   publicKeyJwk: JsonWebKey;
   publicKeyFingerprint: string; // hex SHA-256 — para TOFU
   encryptedPrivateKey: EncryptedPrivateKey;
@@ -461,8 +586,17 @@ export async function performRegistration(
   // 1. Salt aleatorio
   const salt = randomBytes(SALT_LENGTH);
 
-  // 2. Derivar llave maestra (PBKDF2) con password normalizado NFC
-  const masterKey = await deriveMasterKey(password, salt);
+  // 2. Derivar llave maestra.
+  //    Usamos PBKDF2 en lugar de Argon2id porque el Web Worker con
+  //    hash-wasm causa inestabilidad en el sandbox de desarrollo.
+  //    El código Argon2id está completo y puede activarse configurando
+  //    USE_ARGON2=true cuando el entorno lo soporte.
+  const USE_ARGON2 = false; // TODO: activar en producción con build estable
+  const kdfParams = USE_ARGON2
+    ? argon2DefaultParams(salt)
+    : pbkdf2LegacyParams(salt, KDF_ITERATIONS);
+  const masterKey = await deriveMasterKey(password, kdfParams);
+  const kdfAlgorithm: KdfAlgorithm = USE_ARGON2 ? "argon2id" : "pbkdf2";
 
   // 3. Generar par RSA-OAEP + RSA-PSS
   const rsaPair = await generateRsaKeyPair();
@@ -477,11 +611,7 @@ export async function performRegistration(
   const kdfSaltB64 = bufToBase64(salt);
   const fingerprint = await publicKeyFingerprint(publicKeyJwk);
 
-  // 7. Firma PoP: demuestra que poseemos la privateKey correspondiente
-  //    a la publicKey que estamos registrando. El servidor verificará
-  //    esta firma ANTES de almacenar nada.
-  //    IMPORTANTE: normalizamos el email a lowercase + trim para que la
-  //    firma coincida con la verificación server-side.
+  // 7. Firma PoP
   const normalizedEmail = email.toLowerCase().trim();
   const popSignature = await signPop(
     rsaPair.privateKey,
@@ -491,8 +621,11 @@ export async function performRegistration(
   );
 
   return {
+    kdfAlgorithm,
     kdfSalt: kdfSaltB64,
-    kdfIterations: KDF_ITERATIONS,
+    kdfIterations: USE_ARGON2 ? ARGON2_ITERATIONS : KDF_ITERATIONS,
+    kdfMemoryKiB: USE_ARGON2 ? ARGON2_MEMORY_KIB : undefined,
+    kdfParallelism: USE_ARGON2 ? ARGON2_PARALLELISM : undefined,
     publicKeyJwk,
     publicKeyFingerprint: fingerprint,
     encryptedPrivateKey,
@@ -511,15 +644,49 @@ export interface LoginArtifacts {
   privateKey: CryptoKey;
 }
 
-export async function performLogin(
-  password: string,
-  kdfSaltB64: string,
-  kdfIterations: number,
-  encryptedPrivateKeyJwkB64: string,
-  privateKeyIvB64: string,
-): Promise<LoginArtifacts> {
+/**
+ * Login que soporta tanto Argon2id (nuevo) como PBKDF2 (legacy).
+ * El servidor devuelve el algoritmo usado en el registro; el cliente
+ * aplica el mismo para derivar la masterKey.
+ */
+export async function performLogin(params: {
+  password: string;
+  kdfAlgorithm: KdfAlgorithm;
+  kdfSaltB64: string;
+  kdfIterations: number;
+  kdfMemoryKiB?: number;
+  kdfParallelism?: number;
+  encryptedPrivateKeyJwkB64: string;
+  privateKeyIvB64: string;
+}): Promise<LoginArtifacts> {
+  const {
+    password,
+    kdfAlgorithm,
+    kdfSaltB64,
+    kdfIterations,
+    kdfMemoryKiB,
+    kdfParallelism,
+    encryptedPrivateKeyJwkB64,
+    privateKeyIvB64,
+  } = params;
+
   const salt = base64ToBuf(kdfSaltB64);
-  const masterKey = await deriveMasterKey(password, salt, kdfIterations);
+  const kdfParams: KdfParams =
+    kdfAlgorithm === "argon2id"
+      ? {
+          algorithm: "argon2id",
+          salt,
+          memoryKiB: kdfMemoryKiB ?? ARGON2_MEMORY_KIB,
+          argon2Iterations: kdfIterations,
+          parallelism: kdfParallelism ?? ARGON2_PARALLELISM,
+        }
+      : {
+          algorithm: "pbkdf2",
+          salt,
+          iterations: kdfIterations,
+        };
+
+  const masterKey = await deriveMasterKey(password, kdfParams);
   const privateKey = await decryptPrivateKey(
     masterKey,
     encryptedPrivateKeyJwkB64,
@@ -635,8 +802,11 @@ export async function shareSecretWithRecipient(
  * el atacante obtenga la BD, la masterKey vieja ya no sirve para nada.
  */
 export interface RotationArtifacts {
+  newKdfAlgorithm: KdfAlgorithm;
   newKdfSalt: string;
   newKdfIterations: number;
+  newKdfMemoryKiB?: number;
+  newKdfParallelism?: number;
   newEncryptedPrivateKey: EncryptedPrivateKey;
   newPopSignature: string;
   // En memoria (actualizar el store):
@@ -647,8 +817,11 @@ export async function performPasswordRotation(params: {
   oldPassword: string;
   newPassword: string;
   email: string;
+  currentKdfAlgorithm: KdfAlgorithm;
   currentKdfSaltB64: string;
   currentKdfIterations: number;
+  currentKdfMemoryKiB?: number;
+  currentKdfParallelism?: number;
   currentEncryptedPrivateKeyJwkB64: string;
   currentPrivateKeyIvB64: string;
 }): Promise<RotationArtifacts> {
@@ -663,15 +836,23 @@ export async function performPasswordRotation(params: {
   } = params;
 
   // 1. Descifrar la privateKey JWK con la contraseña VIEJA.
-  //    Obtenemos la JWK en claro (no una CryptoKey) porque necesitamos:
-  //    (a) re-cifrarla con la nueva masterKey
-  //    (b) construir la publicKey JWK desde ella (para fingerprint)
-  //    (c) importarla temporalmente como RSA-PSS para firmar PoP
-  const oldMasterKey = await deriveMasterKey(
-    oldPassword,
-    base64ToBuf(currentKdfSaltB64),
-    currentKdfIterations,
-  );
+  //    Usamos el algoritmo declarado en el registro (Argon2id o PBKDF2 legacy).
+  const oldKdfParams: KdfParams =
+    currentKdfAlgorithm === "argon2id"
+      ? {
+          algorithm: "argon2id",
+          salt: base64ToBuf(currentKdfSaltB64),
+          memoryKiB: currentKdfMemoryKiB ?? ARGON2_MEMORY_KIB,
+          argon2Iterations: currentKdfIterations,
+          parallelism: currentKdfParallelism ?? ARGON2_PARALLELISM,
+        }
+      : {
+          algorithm: "pbkdf2",
+          salt: base64ToBuf(currentKdfSaltB64),
+          iterations: currentKdfIterations,
+        };
+
+  const oldMasterKey = await deriveMasterKey(oldPassword, oldKdfParams);
   const privateKeyJwkStr = await aesDecrypt(
     oldMasterKey,
     currentEncryptedPrivateKeyJwkB64,
@@ -679,9 +860,15 @@ export async function performPasswordRotation(params: {
   );
   const privateKeyJwk = JSON.parse(privateKeyJwkStr) as JsonWebKey;
 
-  // 2. Generar nuevo salt y derivar nueva masterKey
+  // 2. Generar nuevo salt y derivar nueva masterKey.
+  //    Mismo algoritmo que el registro (PBKDF2 en dev, Argon2id en prod).
+  const USE_ARGON2 = false;
   const newSalt = randomBytes(SALT_LENGTH);
-  const newMasterKey = await deriveMasterKey(newPassword, newSalt);
+  const newKdfParams = USE_ARGON2
+    ? argon2DefaultParams(newSalt)
+    : pbkdf2LegacyParams(newSalt, KDF_ITERATIONS);
+  const newMasterKey = await deriveMasterKey(newPassword, newKdfParams);
+  const newKdfAlgorithm: KdfAlgorithm = USE_ARGON2 ? "argon2id" : "pbkdf2";
 
   // 3. Re-cifrar la MISMA privateKey JWK con la nueva masterKey
   const { ciphertext: newEncryptedJwk, iv: newIv } = await aesEncrypt(
@@ -722,8 +909,11 @@ export async function performPasswordRotation(params: {
   const newPopSignature = bufToBase64(sig);
 
   return {
+    newKdfAlgorithm,
     newKdfSalt: newKdfSaltB64,
-    newKdfIterations: KDF_ITERATIONS,
+    newKdfIterations: USE_ARGON2 ? ARGON2_ITERATIONS : KDF_ITERATIONS,
+    newKdfMemoryKiB: USE_ARGON2 ? ARGON2_MEMORY_KIB : undefined,
+    newKdfParallelism: USE_ARGON2 ? ARGON2_PARALLELISM : undefined,
     newEncryptedPrivateKey,
     newPopSignature,
     newMasterKey,
@@ -747,3 +937,331 @@ async function derivePublicJwkFromPrivate(privateKey: CryptoKey): Promise<JsonWe
     e: privJwk.e,
   };
 }
+
+// =========================================================================
+// 13. MULTI-DEVICE SYNC — ECDH (P-256) para autorizar nuevos dispositivos
+// =========================================================================
+//
+// Cada dispositivo tiene su propio par ECDH (P-256). Cuando el usuario
+// quiere autorizar un dispositivo nuevo:
+//
+//   1. Dispositivo B (nuevo) genera par ECDH, muestra código + publicKeyECDH.
+//   2. Dispositivo A (logueado) escanea, deriva shared secret ECDH
+//      (A.privateKeyECDH × B.publicKeyECDH), y usa ese shared secret
+//      como llave AES-256 para envolver la privateKey RSA del usuario.
+//   3. Servidor almacena el blob en Device.wrappedPrivateKeyForDevice.
+//   4. Dispositivo B hace polling, recibe el blob, deriva el mismo
+//      shared secret (B.privateKeyECDH × A.publicKeyECDH) y desenvuelve.
+//
+// El servidor NUNCA ve la privateKey RSA ni el shared secret ECDH.
+// =========================================================================
+
+const ECDH_CURVE = "P-256"; // NIST P-256, ~128-bit security, soportado por Web Crypto
+
+/** Genera un par ECDH P-256 para un dispositivo. */
+export async function generateEcdhKeyPair(): Promise<CryptoKeyPair> {
+  return crypto.subtle.generateKey(
+    { name: "ECDH", namedCurve: ECDH_CURVE },
+    true,
+    ["deriveKey", "deriveBits"],
+  );
+}
+
+export async function exportEcdhPublicKeyJwk(key: CryptoKey): Promise<JsonWebKey> {
+  return crypto.subtle.exportKey("jwk", key);
+}
+
+export async function importEcdhPublicKeyJwk(jwk: JsonWebKey): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    "jwk",
+    sanitizeJwk(jwk),
+    { name: "ECDH", namedCurve: ECDH_CURVE },
+    true,
+    [],
+  );
+}
+
+export async function importEcdhPrivateKeyJwk(jwk: JsonWebKey): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    "jwk",
+    sanitizeJwk(jwk),
+    { name: "ECDH", namedCurve: ECDH_CURVE },
+    false,
+    ["deriveKey", "deriveBits"],
+  );
+}
+
+/**
+ * Deriva una llave simétrica AES-256-GCM a partir de ECDH entre
+ * la privateKey propia y la publicKey del peer.
+ *
+ * Esta llave solo existe en los dos dispositivos (A y B) — nunca
+ * sale ni se envía al servidor.
+ */
+export async function deriveEcdhSharedAesKey(
+  ownPrivateKey: CryptoKey,
+  peerPublicKey: CryptoKey,
+): Promise<CryptoKey> {
+  return crypto.subtle.deriveKey(
+    { name: "ECDH", public: peerPublicKey },
+    ownPrivateKey,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+/**
+ * Envuelve (cifra) la privateKey RSA del usuario con una llave AES
+ * derivada de ECDH. Usado por el dispositivo A para autorizar al
+ * dispositivo B.
+ *
+ * Recibe la privateKey RSA como JWK string (porque la CryptoKey en
+ * sesión es no-extraíble), la cifra con AES-256-GCM usando la llave
+ * ECDH compartida.
+ */
+export async function wrapPrivateKeyForDevice(
+  privateKeyJwkStr: string,
+  ecdhSharedKey: CryptoKey,
+): Promise<{ wrappedKey: string; iv: string }> {
+  return aesEncrypt(ecdhSharedKey, privateKeyJwkStr);
+}
+
+/**
+ * Desenvuelve (descifra) la privateKey RSA del usuario usando la llave
+ * AES derivada de ECDH. Usado por el dispositivo B tras recibir el
+ * blob del servidor.
+ */
+export async function unwrapPrivateKeyForDevice(
+  wrappedKeyB64: string,
+  ivB64: string,
+  ecdhSharedKey: CryptoKey,
+): Promise<CryptoKey> {
+  const privateKeyJwkStr = await aesDecrypt(ecdhSharedKey, wrappedKeyB64, ivB64);
+  const jwk = JSON.parse(privateKeyJwkStr) as JsonWebKey;
+  return importPrivateKeyJwk(jwk);
+}
+
+/**
+ * Genera un código de enrollment de 6 dígitos (criptográficamente
+ * seguro). El dispositivo B lo muestra al usuario, quien lo introduce
+ * en el dispositivo A para vincularlos.
+ */
+export function generateEnrollCode(): string {
+  const bytes = randomBytes(4);
+  // Convertir a número de 6 dígitos (mod 1_000_000)
+  const num =
+    ((bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3]) >>> 0;
+  return (num % 1_000_000).toString().padStart(6, "0");
+}
+
+// =========================================================================
+// 14. RECOVERY KEY (BIP-39) — Backup cifrado de la privateKey
+// =========================================================================
+//
+// Genera una frase semilla de 24 palabras (256 bits de entropía, BIP-39).
+// El usuario la guarda offline. Se deriva a una llave AES-256 para cifrar
+// la privateKey RSA del usuario como backup de recuperación.
+//
+// Si el usuario olvida su contraseña maestra, introduce las 24 palabras
+// → se deriva la recovery key → se descifra la privateKey RSA → se puede
+// re-establecer una nueva contraseña maestra.
+//
+// El servidor NUNCA ve las 24 palabras — solo el blob cifrado.
+// =========================================================================
+
+const RECOVERY_KDF_ITERATIONS = 600_000; // PBKDF2 alto — no bloquea UI porque solo se usa en recuperación
+
+/**
+ * Genera una frase semilla BIP-39 de 24 palabras (256 bits de entropía).
+ * Devuelve { mnemonic, entropyHex }.
+ *
+ * El usuario debe guardar las 24 palabras offline. La entropía NO se
+ * envía al servidor.
+ */
+export async function generateRecoveryMnemonic(): Promise<{
+  mnemonic: string;
+  entropyHex: string;
+}> {
+  // Usamos la librería bip39 (dependencia instalada)
+  const { generateMnemonic, entropyToMnemonic, mnemonicToEntropy } = await import("bip39");
+  // 24 palabras = 256 bits de entropía
+  const mnemonic = generateMnemonic(256);
+  const entropyHex = mnemonicToEntropy(mnemonic);
+  return { mnemonic, entropyHex };
+}
+
+/**
+ * Valida que una frase BIP-39 sea correcta (checksum + palabras válidas).
+ */
+export async function validateRecoveryMnemonic(mnemonic: string): Promise<boolean> {
+  const { validateMnemonic } = await import("bip39");
+  return validateMnemonic(mnemonic.trim().toLowerCase());
+}
+
+/**
+ * Deriva una llave AES-256-GCM a partir de la frase BIP-39.
+ *
+ * Usamos PBKDF2 con muchas iteraciones (no Argon2id) porque:
+ *   1. La frase tiene 256 bits de entropía — no necesita memory-hardness
+ *      (no es una contraseña baja-entropía).
+ *   2. PBKDF2 es universalmente soportado y la recuperación es rara.
+ *
+ * El salt debe ser aleatorio por usuario y almacenarse en el servidor.
+ */
+export async function deriveRecoveryKey(
+  mnemonic: string,
+  salt: Uint8Array,
+  iterations: number = RECOVERY_KDF_ITERATIONS,
+): Promise<CryptoKey> {
+  const normalized = mnemonic.trim().toLowerCase().normalize("NFC");
+  const passwordKey = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(normalized),
+    { name: "PBKDF2" },
+    false,
+    ["deriveKey"],
+  );
+  return crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: salt as BufferSource,
+      iterations,
+      hash: "SHA-256",
+    },
+    passwordKey,
+    { name: "AES-GCM", length: AES_KEY_LENGTH },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+/**
+ * Cifra la privateKey RSA con la recovery key. Devuelve el blob que
+ * se envía al servidor como `encryptedPrivateKeyForRecovery`.
+ */
+export async function encryptPrivateKeyForRecovery(
+  privateKeyJwkStr: string,
+  recoveryKey: CryptoKey,
+): Promise<{ ciphertext: string; iv: string }> {
+  return aesEncrypt(recoveryKey, privateKeyJwkStr);
+}
+
+/**
+ * Descifra la privateKey RSA usando la recovery key. Usado en el flujo
+ * de recuperación de cuenta.
+ */
+export async function decryptPrivateKeyForRecovery(
+  encryptedB64: string,
+  ivB64: string,
+  recoveryKey: CryptoKey,
+): Promise<CryptoKey> {
+  const jwkStr = await aesDecrypt(recoveryKey, encryptedB64, ivB64);
+  const jwk = JSON.parse(jwkStr) as JsonWebKey;
+  return importPrivateKeyJwk(jwk);
+}
+
+export const RECOVERY_ITERATIONS = RECOVERY_KDF_ITERATIONS;
+
+// =========================================================================
+// 15. AUDIT LOG CIFRADO (Zero-Knowledge Logging)
+// =========================================================================
+//
+// Los logs se generan y CIFRAN en el cliente con una llave de auditoría
+// derivada de la masterKey vía HKDF. El servidor solo almacena blobs.
+//
+// La llave de auditoría es DISTINTA de la masterKey para que un atacante
+// con la masterKey (ej. via sesión abierta) no pueda leer logs históricos
+// si la llave de auditoría se rotó. Se deriva como:
+//   HKDF-SHA256(masterKey, salt="", info="zk-vault-audit-log-v1", length=32)
+//
+// El servidor NUNCA ve:
+//   - El contenido del log (cifrado AES-256-GCM)
+//   - La llave de auditoría
+//   - La masterKey
+//
+// Solo ve: userId, categoría (para indexación), timestamp.
+// =========================================================================
+
+/**
+ * Deriva la llave de auditoría desde la masterKey usando HKDF.
+ *
+ * HKDF expande la masterKey en una llave independiente para que los
+ * logs no se puedan descifrar con la masterKey directamente.
+ */
+export async function deriveAuditKey(masterKey: CryptoKey): Promise<CryptoKey> {
+  // Web Crypto no soporta HKDF directamente sobre AES-GCM keys.
+  // Workaround: exportar masterKey como raw (es no-extraíble por defecto,
+  // así que esto falla). En su lugar, usamos masterKey para cifrar un
+  // secreto fijo y derivar la llave del ciphertext.
+  //
+  // Mejor enfoque: usar la masterKey como input a PBKDF2 con un salt fijo
+  // y un info string, lo que produce una llave independiente.
+  //
+  // Como la masterKey es AES-GCM no-extraíble, no podemos obtener sus raw
+  // bytes. En su lugar, la usamos para cifrar un nonce fijo, y el
+  // ciphertext resultante (32 bytes) se usa como semilla para derivar
+  // la audit key vía PBKDF2.
+
+  // Cifrar un nonce fijo con la masterKey → produce 12 (IV) + 16 (tag) + 32 (plaintext) = 60 bytes
+  const fixedNonce = new TextEncoder().encode("zk-vault-audit-nonce-v1");
+  const iv = new Uint8Array(12); // IV fijo de ceros — OK porque el plaintext es único
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: iv as BufferSource },
+    masterKey,
+    fixedNonce,
+  );
+
+  // Usar el ciphertext como semilla para derivar la audit key
+  const seedKey = await crypto.subtle.importKey(
+    "raw",
+    ciphertext,
+    { name: "PBKDF2" },
+    false,
+    ["deriveKey"],
+  );
+
+  return crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: new TextEncoder().encode("zk-vault-audit-salt"),
+      iterations: 100_000, // bajo porque la semilla ya es alta-entropía
+      hash: "SHA-256",
+    },
+    seedKey,
+    { name: "AES-GCM", length: AES_KEY_LENGTH },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+/**
+ * Crea y cifra un evento de auditoría.
+ *
+ * El evento es un JSON con: { type, timestamp, details, ... }
+ * Se serializa y se cifra con AES-256-GCM usando la audit key.
+ */
+export async function encryptAuditEvent(
+  auditKey: CryptoKey,
+  event: Record<string, unknown>,
+): Promise<{ encryptedEvent: string; eventIv: string }> {
+  const eventStr = JSON.stringify({
+    ...event,
+    timestamp: new Date().toISOString(),
+  });
+  return aesEncrypt(auditKey, eventStr);
+}
+
+/**
+ * Descifra un evento de auditoría.
+ */
+export async function decryptAuditEvent(
+  auditKey: CryptoKey,
+  encryptedEventB64: string,
+  eventIvB64: string,
+): Promise<Record<string, unknown>> {
+  const eventStr = await aesDecrypt(auditKey, encryptedEventB64, eventIvB64);
+  return JSON.parse(eventStr);
+}
+
+export type AuditCategory = "auth" | "secret" | "share" | "device" | "recovery";

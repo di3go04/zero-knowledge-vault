@@ -46,13 +46,24 @@ export async function POST(req: NextRequest) {
   const {
     email,
     name,
+    kdfAlgorithm,
     kdfSalt,
     kdfIterations,
+    kdfMemoryKiB,
+    kdfParallelism,
     publicKeyJwk,
     encryptedPrivateKeyJwk,
     privateKeyIv,
     popSignature,
   } = body ?? {};
+
+  // -------- kdfAlgorithm --------
+  if (kdfAlgorithm !== "argon2id" && kdfAlgorithm !== "pbkdf2") {
+    return NextResponse.json(
+      { error: "kdfAlgorithm debe ser 'argon2id' o 'pbkdf2'" },
+      { status: 400 },
+    );
+  }
 
   // -------- email --------
   if (
@@ -74,13 +85,49 @@ export async function POST(req: NextRequest) {
   }
 
   // -------- kdfIterations --------
-  if (!validateKdfIterations(kdfIterations)) {
-    return NextResponse.json(
-      {
-        error: `kdfIterations debe ser entero entre ${KDF_ITERATIONS_MIN} y ${KDF_ITERATIONS_MAX}`,
-      },
-      { status: 400 },
-    );
+  //   Argon2id: 1-10 (t = time parameter)
+  //   PBKDF2: 310.000 - 1.000.000
+  if (typeof kdfIterations !== "number" || !Number.isInteger(kdfIterations)) {
+    return NextResponse.json({ error: "kdfIterations debe ser entero" }, { status: 400 });
+  }
+  if (kdfAlgorithm === "argon2id") {
+    if (kdfIterations < 1 || kdfIterations > 10) {
+      return NextResponse.json(
+        { error: "Argon2id: kdfIterations (t) debe estar entre 1 y 10" },
+        { status: 400 },
+      );
+    }
+    // Validar memoria (16 MiB - 1 GiB)
+    if (
+      typeof kdfMemoryKiB !== "number" ||
+      kdfMemoryKiB < 16_384 ||
+      kdfMemoryKiB > 1_048_576
+    ) {
+      return NextResponse.json(
+        { error: "Argon2id: kdfMemoryKiB debe estar entre 16384 (16 MiB) y 1048576 (1 GiB)" },
+        { status: 400 },
+      );
+    }
+    if (
+      typeof kdfParallelism !== "number" ||
+      kdfParallelism < 1 ||
+      kdfParallelism > 16
+    ) {
+      return NextResponse.json(
+        { error: "Argon2id: kdfParallelism debe estar entre 1 y 16" },
+        { status: 400 },
+      );
+    }
+  } else {
+    // PBKDF2 legacy
+    if (kdfIterations < KDF_ITERATIONS_MIN || kdfIterations > KDF_ITERATIONS_MAX) {
+      return NextResponse.json(
+        {
+          error: `PBKDF2: kdfIterations debe estar entre ${KDF_ITERATIONS_MIN} y ${KDF_ITERATIONS_MAX}`,
+        },
+        { status: 400 },
+      );
+    }
   }
 
   // -------- kdfSalt: base64 + longitud decodificada --------
@@ -182,8 +229,11 @@ export async function POST(req: NextRequest) {
         typeof name === "string" && name.trim() ? name.trim().slice(0, NAME_MAX_LEN) : null,
       keyMaterial: {
         create: {
+          kdfAlgorithm,
           kdfSalt,
           kdfIterations,
+          kdfMemoryKiB: kdfAlgorithm === "argon2id" ? kdfMemoryKiB : null,
+          kdfParallelism: kdfAlgorithm === "argon2id" ? kdfParallelism : null,
           publicKeyJwk: jwkStr,
           publicKeyFingerprint: serverFingerprint,
           popSignature,

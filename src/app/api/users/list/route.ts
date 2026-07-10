@@ -10,7 +10,7 @@ import { db } from "@/lib/db";
 import { requireAuth } from "@/lib/auth-helper";
 
 export async function GET(req: NextRequest) {
-  const auth = requireAuth(req);
+  const auth = await requireAuth(req);
   if (!auth.ok) return auth.response;
   const userId = auth.userId;
 

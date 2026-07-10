@@ -28,6 +28,49 @@ model User {
   keyMaterial     UserKeyMaterial?
   ownedSecrets    Secret[]
   secretKeyShares SecretKeyShare[]
+  devices         Device[]
+  auditLogs       AuditLog[]
+}
+
+// ---------------------------------------------------------------------
+// Multi-Device Sync (ECDH)
+// ---------------------------------------------------------------------
+// Cada dispositivo autorizado tiene su propio par ECDH (P-256). La
+// privateKey RSA del usuario se envuelve (wrap) con una llave simétrica
+// derivada vía ECDH entre la publicKey ECDH del dispositivo y una
+// privateKey ECDH efímera del dispositivo que autoriza.
+//
+// Flujo "Enroll Device":
+//   1. Dispositivo B genera par ECDH, muestra código + publicKeyECDH.
+//   2. Dispositivo A (logueado) escanea, deriva ECDH shared secret,
+//      envuelve la privateKey RSA del usuario con ese shared secret.
+//   3. Servidor almacena el blob en Device.wrappedPrivateKeyForDevice.
+//   4. Dispositivo B hace polling, recibe el blob, desenvuelve con su
+//      privateKey ECDH, obtiene la privateKey RSA del usuario.
+//
+// El servidor NUNCA ve la privateKey RSA en claro ni el shared secret
+// ECDH (que solo existe en los dos dispositivos).
+// ---------------------------------------------------------------------
+model Device {
+  id                            String   @id @default(cuid())
+  userId                        String
+  user                          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceName                    String   // etiqueta legible: "Mac de Ana"
+  // Llave pública ECDH P-256 del dispositivo (JWK, en claro)
+  publicKeyECDH                 String   // JSON
+  publicKeyECDHFingerprint      String   // hex SHA-256 del JWK canonizado
+  // PrivateKey RSA del usuario, envuelta con la llave simétrica derivada
+  // vía ECDH entre este dispositivo y el dispositivo que lo autorizó.
+  wrappedPrivateKeyForDevice    String   // base64, AES-256-GCM
+  wrappedPrivateKeyIv           String   // base64, 12 bytes
+  enrollCode                    String?  // código de 6 dígitos (solo durante enrollment)
+  enrollCodeExpiresAt           DateTime?
+  enrolledAt                    DateTime @default(now())
+  lastSeenAt                    DateTime @default(now())
+  revokedAt                     DateTime? // null = activo
+
+  @@index([userId])
+  @@index([enrollCode])
 }
 
 // ---------------------------------------------------------------------
@@ -44,14 +87,31 @@ model UserKeyMaterial {
   id                     String   @id @default(cuid())
   userId                 String   @unique
   user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // KDF — Argon2id (preferido) o PBKDF2 (legacy)
+  kdfAlgorithm           String   @default("argon2id") // "argon2id" | "pbkdf2"
   kdfSalt                String   // base64, público
-  kdfIterations          Int      // público
+  kdfIterations          Int      // Argon2id: t (time). PBKDF2: iteraciones.
+  kdfMemoryKiB           Int?     // Argon2id: m (memory). PBKDF2: null.
+  kdfParallelism         Int?     // Argon2id: p (parallelism). PBKDF2: null.
   publicKeyJwk           String   // JSON string, público
   publicKeyFingerprint   String   // hex SHA-256 del JWK canonizado — para TOFU y detección de sustitución
   popSignature           String   // base64 — firma RSA-PSS de {email, publicKeyFingerprint, kdfSalt} con la privateKey
   popSignatureHash       String   // "SHA-256" — algoritmo usado para la firma PoP (auditabilidad)
-  encryptedPrivateKeyJwk String   // base64, AES-256-GCM ciphertext
+  encryptedPrivateKeyJwk String   // base64, AES-256-GCM ciphertext con masterKey
   privateKeyIv           String   // base64, público
+
+  // Recovery Key (BIP-39) — backup cifrado de la privateKey RSA
+  // El usuario recibe 24 palabras en el registro. Estas se derivan a
+  // una llave AES-256 que cifra la MISMA privateKey RSA. Si el usuario
+  // olvida su contraseña maestra, puede usar la frase de 24 palabras
+  // para descifrar este blob y recuperar su cuenta.
+  // El servidor NUNCA ve las 24 palabras — solo el blob cifrado.
+  recoverySalt           String?  // base64, salt para derivar recovery key
+  recoveryIterations     Int?     // PBKDF2 iteraciones para recovery key (puede ser alto, no bloquea UI)
+  encryptedPrivateKeyForRecovery String? // base64, AES-256-GCM con recovery key
+  recoveryIv             String?  // base64, 12 bytes
+  recoveryEnabled        Boolean  @default(false)
+
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
@@ -95,4 +155,32 @@ model SecretKeyShare {
   createdAt           DateTime @default(now())
 
   @@unique([secretId, recipientId])
+}
+
+// ---------------------------------------------------------------------
+// Audit Log cifrado (Zero-Knowledge Logging)
+// ---------------------------------------------------------------------
+// Los logs se generan y CIFRAN en el cliente (AES-256-GCM con una llave
+// de auditoría derivada de la masterKey del usuario). El servidor solo
+// almacena blobs cifrados + metadata mínima (timestamp, tipo de evento
+// cifrado). Esto permite auditoría forense sin filtrar información
+// sensible en logs del servidor.
+//
+// La llave de auditoría es distinta de la masterKey para evitar que un
+// atacante con la masterKey (ej. via sesión abierta) pueda leer los logs
+// históricos. Se deriva como HKDF(masterKey, "audit-log-v1").
+// ---------------------------------------------------------------------
+model AuditLog {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Tipo de evento CIFRADO (no filtrar metadata en logs del server)
+  encryptedEvent  String   // base64, AES-256-GCM
+  eventIv         String   // base64, 12 bytes
+  // Metadata no cifrada (mínima, para indexación)
+  eventCategory   String   // "auth" | "secret" | "share" | "rotation" | "device"
+  createdAt       DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([eventCategory])
 }

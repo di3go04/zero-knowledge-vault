@@ -43,7 +43,7 @@ import {
 import { requireAuth } from "@/lib/auth-helper";
 
 export async function POST(req: NextRequest) {
-  const auth = requireAuth(req);
+  const auth = await requireAuth(req);
   if (!auth.ok) return auth.response;
   const userId = auth.userId;
 
@@ -55,19 +55,54 @@ export async function POST(req: NextRequest) {
   }
 
   const {
+    newKdfAlgorithm,
     newKdfSalt,
     newKdfIterations,
+    newKdfMemoryKiB,
+    newKdfParallelism,
     newEncryptedPrivateKeyJwk,
     newPrivateKeyIv,
     newPopSignature,
   } = body ?? {};
 
-  // -------- Validaciones --------
-  if (!validateKdfIterations(newKdfIterations)) {
+  // -------- kdfAlgorithm --------
+  if (newKdfAlgorithm !== "argon2id" && newKdfAlgorithm !== "pbkdf2") {
     return NextResponse.json(
-      { error: `newKdfIterations debe ser entero entre ${KDF_ITERATIONS_MIN} y ${KDF_ITERATIONS_MAX}` },
+      { error: "newKdfAlgorithm debe ser 'argon2id' o 'pbkdf2'" },
       { status: 400 },
     );
+  }
+
+  // -------- kdfIterations --------
+  if (typeof newKdfIterations !== "number" || !Number.isInteger(newKdfIterations)) {
+    return NextResponse.json({ error: "newKdfIterations debe ser entero" }, { status: 400 });
+  }
+  if (newKdfAlgorithm === "argon2id") {
+    if (newKdfIterations < 1 || newKdfIterations > 10) {
+      return NextResponse.json(
+        { error: "Argon2id: newKdfIterations (t) debe estar entre 1 y 10" },
+        { status: 400 },
+      );
+    }
+    if (typeof newKdfMemoryKiB !== "number" || newKdfMemoryKiB < 16_384 || newKdfMemoryKiB > 1_048_576) {
+      return NextResponse.json(
+        { error: "Argon2id: newKdfMemoryKiB debe estar entre 16384 y 1048576" },
+        { status: 400 },
+      );
+    }
+    if (typeof newKdfParallelism !== "number" || newKdfParallelism < 1 || newKdfParallelism > 16) {
+      return NextResponse.json(
+        { error: "Argon2id: newKdfParallelism debe estar entre 1 y 16" },
+        { status: 400 },
+      );
+    }
+  } else {
+    if (newKdfIterations < KDF_ITERATIONS_MIN || newKdfIterations > KDF_ITERATIONS_MAX) {
+      return NextResponse.json(
+        { error: `PBKDF2: newKdfIterations debe estar entre ${KDF_ITERATIONS_MIN} y ${KDF_ITERATIONS_MAX}` },
+        { status: 400 },
+      );
+    }
   }
   if (!validateBase64Blob(newKdfSalt, SALT_MIN_BYTES, SALT_MAX_BYTES)) {
     return NextResponse.json(
@@ -130,8 +165,11 @@ export async function POST(req: NextRequest) {
   await db.userKeyMaterial.update({
     where: { userId },
     data: {
+      kdfAlgorithm: newKdfAlgorithm,
       kdfSalt: newKdfSalt,
       kdfIterations: newKdfIterations,
+      kdfMemoryKiB: newKdfAlgorithm === "argon2id" ? newKdfMemoryKiB : null,
+      kdfParallelism: newKdfAlgorithm === "argon2id" ? newKdfParallelism : null,
       encryptedPrivateKeyJwk: newEncryptedPrivateKeyJwk,
       privateKeyIv: newPrivateKeyIv,
       popSignature: newPopSignature,
@@ -142,6 +180,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     rotated: true,
     userId,
+    newKdfAlgorithm,
     newKdfSalt,
     newKdfIterations,
     publicKeyFingerprint: serverFingerprint, // sin cambios

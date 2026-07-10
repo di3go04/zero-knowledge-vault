@@ -240,6 +240,32 @@ const SECURITY_GUARANTEES = [
     title: "Rotación de contraseña maestra (Ciclo 3)",
     desc: "POST /api/auth/rotate permite cambiar la contraseña maestra sin perder access a secretos existentes. Se genera nuevo salt, se deriva nueva masterKey, y se re-cifra la MISMA privateKey RSA. Las wrappedKeys existentes siguen siendo válidas porque la publicKey no cambió. El servidor verifica PoP con la privateKey actual antes de aceptar la rotación.",
   },
+  // ---- Fase 2: Endurecimiento empresarial ----
+  {
+    icon: KeyRound,
+    title: "Argon2id memory-hard KDF (Fase 2)",
+    desc: "Reemplazo de PBKDF2 por Argon2id (vencedor PHC 2015) con parámetros OWASP 2024: m=64 MiB, t=3, p=4. Resistente a ataques GPU/ASIC porque cada intento requiere 64 MiB de VRAM. Se ejecuta en Web Worker para no bloquear la UI. Compatibilidad legacy con cuentas PBKDF2 existentes.",
+  },
+  {
+    icon: Users,
+    title: "Multi-Device Sync con ECDH P-256 (Fase 2)",
+    desc: "Cada dispositivo autorizado tiene su propio par ECDH. Flujo 'Enroll Device': dispositivo B genera código + publicKey ECDH, dispositivo A (logueado) deriva shared secret ECDH y envuelve la privateKey RSA del usuario. El servidor nunca ve la privateKey ni el shared secret. Endpoint DELETE /api/devices/[id] para revocar dispositivos perdidos.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Recuperación de cuenta con BIP-39 (Fase 2)",
+    desc: "Frase semilla de 24 palabras (256 bits entropía) generada en el registro. Se deriva a llave AES-256 que cifra la privateKey RSA como backup. Si el usuario olvida su contraseña maestra, introduce las 24 palabras → descifra la privateKey → re-establece nueva contraseña. El servidor NUNCA ve las palabras — solo el blob cifrado.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Logout server-side real con Redis blacklist (Fase 2)",
+    desc: "Cada token incluye jti (JWT ID único). En logout, el jti se inserta en Redis con TTL = tiempo restante de expiración. Middleware requireAuth() verifica blacklist en cada petición. Fallback a Map in-memory si Redis no está disponible. Invalidación inmediata de sesiones comprometidas.",
+  },
+  {
+    icon: EyeOff,
+    title: "Audit Log cifrado Zero-Knowledge (Fase 2)",
+    desc: "Logs generados y cifrados en el cliente (AES-256-GCM) con llave de auditoría derivada HKDF(masterKey). El servidor solo almacena blobs cifrados + categoría para indexación. Solo el usuario puede descifrar sus logs. Categorías: auth, secret, share, device, recovery. Sin filtración de metadata en logs del servidor.",
+  },
 ];
 
 const DB_SCHEMA = [

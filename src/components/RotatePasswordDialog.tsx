@@ -90,8 +90,11 @@ export function RotatePasswordDialog({ open, onOpenChange, onRotated }: RotatePa
         oldPassword: oldPass,
         newPassword: newPass,
         email: session.email,
+        currentKdfAlgorithm: loginData.kdfAlgorithm,
         currentKdfSaltB64: loginData.kdfSalt,
         currentKdfIterations: loginData.kdfIterations,
+        currentKdfMemoryKiB: loginData.kdfMemoryKiB,
+        currentKdfParallelism: loginData.kdfParallelism,
         currentEncryptedPrivateKeyJwkB64: loginData.encryptedPrivateKeyJwk,
         currentPrivateKeyIvB64: loginData.privateKeyIv,
       });
@@ -100,8 +103,11 @@ export function RotatePasswordDialog({ open, onOpenChange, onRotated }: RotatePa
       const res = await apiFetch("/api/auth/rotate", {
         method: "POST",
         body: JSON.stringify({
+          newKdfAlgorithm: artifacts.newKdfAlgorithm,
           newKdfSalt: artifacts.newKdfSalt,
           newKdfIterations: artifacts.newKdfIterations,
+          newKdfMemoryKiB: artifacts.newKdfMemoryKiB,
+          newKdfParallelism: artifacts.newKdfParallelism,
           newEncryptedPrivateKeyJwk: artifacts.newEncryptedPrivateKey.encryptedJwk,
           newPrivateKeyIv: artifacts.newEncryptedPrivateKey.iv,
           newPopSignature: artifacts.newPopSignature,

@@ -20,7 +20,7 @@ const WRAPPED_KEY_BYTES = 256;
 
 // ----------------------- GET (list) -----------------------
 export async function GET(req: NextRequest) {
-  const auth = requireAuth(req);
+  const auth = await requireAuth(req);
   if (!auth.ok) return auth.response;
   const userId = auth.userId;
 
@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
 
 // ----------------------- POST (create) -----------------------
 export async function POST(req: NextRequest) {
-  const auth = requireAuth(req);
+  const auth = await requireAuth(req);
   if (!auth.ok) return auth.response;
   const userId = auth.userId;
 

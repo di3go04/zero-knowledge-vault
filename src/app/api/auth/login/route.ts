@@ -78,11 +78,10 @@ export async function POST(req: NextRequest) {
 
   // -------- CASO 1: usuario real --------
   if (user && user.keyMaterial) {
-    // Resetear rate-limit tras login exitoso (el usuario legitimo no debe
-    // ser penalizado por intentos previos fallidos suyos).
     resetRateLimit(rlKey);
 
-    const fingerprint = user.keyMaterial.publicKeyFingerprint;
+    const km = user.keyMaterial;
+    const fingerprint = km.publicKeyFingerprint;
     const sessionToken = issueSessionToken(user.id);
     const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL;
 
@@ -90,11 +89,14 @@ export async function POST(req: NextRequest) {
       userId: user.id,
       email: user.email,
       name: user.name,
-      kdfSalt: user.keyMaterial.kdfSalt,
-      kdfIterations: user.keyMaterial.kdfIterations,
-      encryptedPrivateKeyJwk: user.keyMaterial.encryptedPrivateKeyJwk,
-      privateKeyIv: user.keyMaterial.privateKeyIv,
-      publicKeyJwk: JSON.parse(user.keyMaterial.publicKeyJwk),
+      kdfAlgorithm: km.kdfAlgorithm, // "argon2id" | "pbkdf2"
+      kdfSalt: km.kdfSalt,
+      kdfIterations: km.kdfIterations,
+      kdfMemoryKiB: km.kdfMemoryKiB, // null para PBKDF2
+      kdfParallelism: km.kdfParallelism, // null para PBKDF2
+      encryptedPrivateKeyJwk: km.encryptedPrivateKeyJwk,
+      privateKeyIv: km.privateKeyIv,
+      publicKeyJwk: JSON.parse(km.publicKeyJwk),
       publicKeyFingerprint: fingerprint,
       sessionToken,
       expiresAt,
@@ -110,13 +112,16 @@ export async function POST(req: NextRequest) {
     userId: `decoy-${normalizedEmail}`,
     email: normalizedEmail,
     name: null,
+    kdfAlgorithm: "argon2id" as const, // mismo algoritmo que cuentas reales
     kdfSalt: decoy.kdfSalt,
     kdfIterations: decoy.kdfIterations,
+    kdfMemoryKiB: 65536, // 64 MiB — plausible
+    kdfParallelism: 4,
     encryptedPrivateKeyJwk: decoy.encryptedPrivateKeyJwk,
     privateKeyIv: decoy.privateKeyIv,
     publicKeyJwk: decoy.publicKeyJwk,
     publicKeyFingerprint: await publicKeyFingerprint(decoy.publicKeyJwk as Record<string, unknown>),
-    sessionToken: null, // no se emite token para decoys
+    sessionToken: null,
     expiresAt: null,
     isDecoy: true,
   });

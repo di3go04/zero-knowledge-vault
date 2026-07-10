@@ -60,8 +60,11 @@ export function AuthView() {
         body: JSON.stringify({
           email: regEmail,
           name: regName || undefined,
+          kdfAlgorithm: artifacts.kdfAlgorithm,
           kdfSalt: artifacts.kdfSalt,
           kdfIterations: artifacts.kdfIterations,
+          kdfMemoryKiB: artifacts.kdfMemoryKiB,
+          kdfParallelism: artifacts.kdfParallelism,
           publicKeyJwk: artifacts.publicKeyJwk,
           publicKeyFingerprint: artifacts.publicKeyFingerprint,
           popSignature: artifacts.popSignature,
@@ -145,13 +148,16 @@ export function AuthView() {
       // 2. Derivar masterKey y descifrar la privateKey LOCALMENTE.
       //    Para un decoy, AES-GCM lanzará una excepción (tag inválido) —
       //    mismo comportamiento que contraseña incorrecta.
-      const { masterKey, privateKey } = await performLogin(
-        logPass,
-        data.kdfSalt,
-        data.kdfIterations,
-        data.encryptedPrivateKeyJwk,
-        data.privateKeyIv,
-      );
+      const { masterKey, privateKey } = await performLogin({
+        password: logPass,
+        kdfAlgorithm: data.kdfAlgorithm,
+        kdfSaltB64: data.kdfSalt,
+        kdfIterations: data.kdfIterations,
+        kdfMemoryKiB: data.kdfMemoryKiB,
+        kdfParallelism: data.kdfParallelism,
+        encryptedPrivateKeyJwkB64: data.encryptedPrivateKeyJwk,
+        privateKeyIvB64: data.privateKeyIv,
+      });
 
       // 3. Importar la llave pública para tenerla lista en sesión
       const publicKey = await importPublicKeyJwk(data.publicKeyJwk);

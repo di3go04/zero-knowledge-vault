@@ -42,7 +42,7 @@ export function VaultView() {
   const { toast } = useToast();
   const session = useSession();
   const logout = useSession((s) => s.logout);
-  const { apiFetch } = useApi();
+  const { apiFetch, serverLogout } = useApi();
 
   const [secrets, setSecrets] = useState<SecretListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -182,7 +182,7 @@ export function VaultView() {
             >
               <RotateIcon className="mr-2 size-3.5" /> Rotar clave
             </Button>
-            <Button variant="ghost" size="sm" onClick={logout}>
+            <Button variant="ghost" size="sm" onClick={() => serverLogout()}>
               <LogOut className="mr-2 size-3.5" /> Salir
             </Button>
           </div>

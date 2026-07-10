@@ -21,7 +21,7 @@ import { requireAuth } from "@/lib/auth-helper";
 const WRAPPED_KEY_BYTES = 256;
 
 export async function POST(req: NextRequest) {
-  const auth = requireAuth(req);
+  const auth = await requireAuth(req);
   if (!auth.ok) return auth.response;
   const ownerId = auth.userId;
 
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
  * El destinatario solo puede revocar SU share, no el de otros.
  */
 export async function DELETE(req: NextRequest) {
-  const auth = requireAuth(req);
+  const auth = await requireAuth(req);
   if (!auth.ok) return auth.response;
   const requesterId = auth.userId;
 

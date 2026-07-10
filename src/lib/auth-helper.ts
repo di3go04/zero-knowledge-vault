@@ -6,12 +6,17 @@ import { extractUserIdFromAuth } from "./session-token";
 
 /**
  * Extrae el userId autenticado del header Authorization.
- * Devuelve { userId } si el token es válido, o { response: 401 } si no.
+ * Verifica firma HMAC + blacklist (Redis o Map in-memory).
+ *
+ * ASYNC: la verificación de blacklist requiere I/O (Redis).
  */
-export function requireAuth(req: NextRequest):
+export async function requireAuth(
+  req: NextRequest,
+): Promise<
   | { ok: true; userId: string }
-  | { ok: false; response: NextResponse } {
-  const userId = extractUserIdFromAuth(req.headers.get("authorization"));
+  | { ok: false; response: NextResponse }
+> {
+  const userId = await extractUserIdFromAuth(req.headers.get("authorization"));
   if (!userId) {
     return {
       ok: false,
