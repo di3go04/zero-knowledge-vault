@@ -1,0 +1,93 @@
+// =====================================================================
+// Zero-Knowledge Password Manager — Prisma Schema
+// =====================================================================
+// El servidor actúa como "crypto-blind store": SOLO almacena blobs
+// cifrados, sales, IVs y llaves públicas. Nunca recibe ni almacena
+// llaves maestras, llaves privadas en claro, ni claves simétricas.
+// =====================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------
+// Usuario: solo metadatos. La contraseña NUNCA se almacena.
+// ---------------------------------------------------------------------
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  keyMaterial     UserKeyMaterial?
+  ownedSecrets    Secret[]
+  secretKeyShares SecretKeyShare[]
+}
+
+// ---------------------------------------------------------------------
+// Material criptográfico del usuario.
+// - kdfSalt: SAL en claro (base64). Pública. Necesaria para PBKDF2.
+// - kdfIterations: int. Público.
+// - publicKeyJwk: JSON en claro. Llave pública RSA-OAEP.
+// - encryptedPrivateKeyJwk: BLOB cifrado (AES-256-GCM) con la llave
+//   maestra derivada del password del usuario. El servidor NO puede
+//   descifrar esto.
+// - privateKeyIv: IV en claro (base64) usado para cifrar la llave privada.
+// ---------------------------------------------------------------------
+model UserKeyMaterial {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kdfSalt                String   // base64, público
+  kdfIterations          Int      // público
+  publicKeyJwk           String   // JSON string, público
+  encryptedPrivateKeyJwk String   // base64, AES-256-GCM ciphertext
+  privateKeyIv           String   // base64, público
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------
+// Secreto: contenido cifrado con AES-256-GCM.
+// - El título TAMBIÉN va cifrado (Zero-Knowledge estricto).
+// - encryptedData / encryptedTitle: blobs AES-256-GCM.
+// - El servidor no conoce ni el título ni el contenido.
+// ---------------------------------------------------------------------
+model Secret {
+  id             String   @id @default(cuid())
+  ownerId        String
+  owner          User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  encryptedTitle String   // base64, AES-256-GCM
+  titleIv        String   // base64
+  encryptedData  String   // base64, AES-256-GCM
+  dataIv         String   // base64
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  keyShares SecretKeyShare[]
+}
+
+// ---------------------------------------------------------------------
+// Share: la clave simétrica AES que desencripta el secreto, "envuelta"
+// (wrapped) con la llave PÚBLICA RSA-OAEP del destinatario.
+// - Solo el destinatario puede desenvolverla con su llave privada.
+// - El servidor nunca ve la clave simétrica en claro.
+// - El propietario del secreto también tiene un share para sí mismo.
+// ---------------------------------------------------------------------
+model SecretKeyShare {
+  id                  String   @id @default(cuid())
+  secretId            String
+  secret              Secret   @relation(fields: [secretId], references: [id], onDelete: Cascade)
+  recipientId         String
+  recipient           User     @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  wrappedSymmetricKey String   // base64, RSA-OAEP(AES key)
+  createdAt           DateTime @default(now())
+
+  @@unique([secretId, recipientId])
+}
