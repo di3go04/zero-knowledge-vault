@@ -75,12 +75,29 @@ export function AuthView() {
         throw new Error(data?.error ?? "Error al registrar");
       }
 
-      // 3. Autosesión inmediata (ya tenemos masterKey y privateKey en memoria)
+      // 3. Autosesión inmediata — pero necesitamos un sessionToken.
+      //    El endpoint /register NO emite tokens (no recibe la contraseña
+      //    para validación, solo blobs). Así que llamamos a /login para
+      //    obtener el token. Ya tenemos masterKey + privateKey en memoria,
+      //    así que el descifrado del login será instantáneo.
+      const loginRes = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: regEmail }),
+      });
+      const loginData = await loginRes.json();
+      if (!loginRes.ok || !loginData.sessionToken) {
+        throw new Error("Registro OK pero no se pudo iniciar sesión automáticamente.");
+      }
+
+      // 4. Autosesión inmediata con token
       login({
         userId: data.userId,
         email: data.email,
         name: data.name,
         publicKeyJwk: artifacts.publicKeyJwk,
+        sessionToken: loginData.sessionToken,
+        expiresAt: loginData.expiresAt,
         masterKey: artifacts.masterKey,
         privateKey: artifacts.privateKey,
         publicKey: artifacts.publicKey,
@@ -139,11 +156,20 @@ export function AuthView() {
       // 3. Importar la llave pública para tenerla lista en sesión
       const publicKey = await importPublicKeyJwk(data.publicKeyJwk);
 
+      // 4. Guardar sessionToken emitido por el servidor (HMAC-signed)
+      if (!data.sessionToken) {
+        // Esto solo ocurre si el login era un decoy — pero el descifrado
+        // ya debería haber fallado arriba. Por seguridad, abortamos.
+        throw new Error("No se emitió token de sesión.");
+      }
+
       login({
         userId: data.userId,
         email: data.email,
         name: data.name,
         publicKeyJwk: data.publicKeyJwk,
+        sessionToken: data.sessionToken,
+        expiresAt: data.expiresAt,
         masterKey,
         privateKey,
         publicKey,

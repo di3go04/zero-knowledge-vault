@@ -1,29 +1,19 @@
 /**
  * POST /api/auth/login
  *
- * Recibe solo el email y devuelve el material criptográfico PÚBLICO
- * necesario para que el cliente haga PBKDF2 + descifre localmente su
- * llave privada.
- *
- * MEJORA Ciclo 1 — Anti-enumeración:
- *   Si el email NO existe, se devuelve una respuesta DECOY con
- *   material criptográfico determinista derivado del email (HMAC-SHA-256
- *   con clave del servidor). La respuesta tiene EXACTAMENTE la misma
- *   estructura que la de un usuario real, de modo que el atacante no
- *   puede distinguir "email no registrado" de "contraseña incorrecta".
- *   El cliente ejecutará PBKDF2 + AES-GCM y obtendrá un error de tag
- *   GCM inválido — mismo UX que contraseña incorrecta.
+ * MEJORAS Ciclo 2:
+ *   1. Rate-limiting: 5 intentos / 15 min / IP+email. Devuelve 429 con
+ *      Retry-After si se excede. Previene ataques de fuerza bruta que
+ *      intentan obtener material para brute-force offline.
+ *   2. Emite un session token HMAC-signed (HS256) que el cliente debe
+ *      enviar en `Authorization: Bearer <token>` en todas las requests
+ *      autenticadas. Reemplaza el header x-user-id que era forjable.
  *
  * Body: { email }
  * Response (real o decoy):
  *   { userId, email, name, kdfSalt, kdfIterations,
  *     encryptedPrivateKeyJwk, privateKeyIv, publicKeyJwk,
- *     publicKeyFingerprint, isDecoy? }
- *
- * El campo `isDecoy` se incluye SOLO cuando es decoy, para que el
- * cliente sepa que el fallo posterior de descifrado es esperado.
- * (Esto NO filtra al atacante porque el atacante ya sabe que pidió
- * un email inventado; el campo es para diagnóstico interno del cliente.)
+ *     publicKeyFingerprint, sessionToken, expiresAt, isDecoy? }
  */
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
@@ -31,8 +21,18 @@ import {
   generateDecoyLoginResponse,
   publicKeyFingerprint,
 } from "@/lib/crypto-server";
+import { issueSessionToken, SESSION_TTL } from "@/lib/session-token";
+import { checkRateLimit, resetRateLimit } from "@/lib/rate-limit";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function getClientIp(req: NextRequest): string {
+  const xff = req.headers.get("x-forwarded-for");
+  if (xff) return xff.split(",")[0].trim();
+  const xri = req.headers.get("x-real-ip");
+  if (xri) return xri;
+  return "unknown";
+}
 
 export async function POST(req: NextRequest) {
   let body: any;
@@ -47,6 +47,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "email inválido" }, { status: 400 });
   }
   const normalizedEmail = email.toLowerCase().trim();
+  const ip = getClientIp(req);
+
+  // -------- Rate limit --------
+  // Clave compuesta: IP + email. Así, un atacante desde una IP no puede
+  // atacar a múltiples emails sin que se le agote el cupo por IP.
+  const rlKey = `login:${ip}:${normalizedEmail}`;
+  const rl = checkRateLimit(rlKey, 5, 15 * 60 * 1000);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      {
+        error: "Demasiados intentos. Intenta más tarde.",
+        retryAfter: rl.retryAfterSeconds,
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(rl.retryAfterSeconds),
+          "X-RateLimit-Remaining": "0",
+          "X-RateLimit-Reset": String(rl.retryAfterSeconds),
+        },
+      },
+    );
+  }
 
   const user = await db.user.findUnique({
     where: { email: normalizedEmail },
@@ -55,7 +78,14 @@ export async function POST(req: NextRequest) {
 
   // -------- CASO 1: usuario real --------
   if (user && user.keyMaterial) {
+    // Resetear rate-limit tras login exitoso (el usuario legitimo no debe
+    // ser penalizado por intentos previos fallidos suyos).
+    resetRateLimit(rlKey);
+
     const fingerprint = user.keyMaterial.publicKeyFingerprint;
+    const sessionToken = issueSessionToken(user.id);
+    const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL;
+
     return NextResponse.json({
       userId: user.id,
       email: user.email,
@@ -66,15 +96,15 @@ export async function POST(req: NextRequest) {
       privateKeyIv: user.keyMaterial.privateKeyIv,
       publicKeyJwk: JSON.parse(user.keyMaterial.publicKeyJwk),
       publicKeyFingerprint: fingerprint,
+      sessionToken,
+      expiresAt,
       isDecoy: false,
     });
   }
 
   // -------- CASO 2: usuario inexistente → DECOY --------
-  // Generamos material criptográficamente determinista derivado del email.
-  // El cliente ejecutará PBKDF2 (CPU cost) y luego AES-GCM fallará con
-  // tag inválido — mismo flujo que contraseña incorrecta. El atacante
-  // no puede distinguir ambos casos.
+  // IMPORTANTE: NO reseteamos el rate-limit aquí, para que un atacante
+  // que sonda emails inexistentes consuma su cupo de intentos.
   const decoy = generateDecoyLoginResponse(normalizedEmail);
   return NextResponse.json({
     userId: `decoy-${normalizedEmail}`,
@@ -86,6 +116,8 @@ export async function POST(req: NextRequest) {
     privateKeyIv: decoy.privateKeyIv,
     publicKeyJwk: decoy.publicKeyJwk,
     publicKeyFingerprint: await publicKeyFingerprint(decoy.publicKeyJwk as Record<string, unknown>),
+    sessionToken: null, // no se emite token para decoys
+    expiresAt: null,
     isDecoy: true,
   });
 }

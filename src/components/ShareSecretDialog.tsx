@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/lib/session-store";
+import { useApi } from "@/lib/api-client";
 import {
   importPublicKeyJwk,
   publicKeyFingerprint,
@@ -44,6 +45,7 @@ interface PublicUser {
 export function ShareSecretDialog({ open, onOpenChange, secret }: ShareSecretDialogProps) {
   const { toast } = useToast();
   const session = useSession();
+  const { apiFetch } = useApi();
 
   const [users, setUsers] = useState<PublicUser[]>([]);
   const [selectedId, setSelectedId] = useState("");
@@ -62,9 +64,7 @@ export function ShareSecretDialog({ open, onOpenChange, secret }: ShareSecretDia
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/users/list", {
-          headers: { "x-user-id": session.userId },
-        });
+        const res = await apiFetch("/api/users/list");
         const data = await res.json();
         if (cancelled) return;
         setUsers(data.users ?? []);
@@ -98,7 +98,7 @@ export function ShareSecretDialog({ open, onOpenChange, secret }: ShareSecretDia
       const recipientEmail = users.find((u) => u.id === selectedId)?.email;
       if (!recipientEmail) return;
       try {
-        const res = await fetch(
+        const res = await apiFetch(
           `/api/users/lookup?email=${encodeURIComponent(recipientEmail)}`,
         );
         const data = await res.json();
@@ -159,7 +159,7 @@ export function ShareSecretDialog({ open, onOpenChange, secret }: ShareSecretDia
       if (!recipientEmail) throw new Error("Destinatario no encontrado");
 
       // 1. Obtener la llave pública del destinatario
-      const recipientRes = await fetch(
+      const recipientRes = await apiFetch(
         `/api/users/lookup?email=${encodeURIComponent(recipientEmail)}`,
       );
       const recipient = await recipientRes.json();
@@ -186,12 +186,8 @@ export function ShareSecretDialog({ open, onOpenChange, secret }: ShareSecretDia
       );
 
       // 5. Enviar al servidor la nueva wrappedKey (solo un blob)
-      const res = await fetch("/api/shares", {
+      const res = await apiFetch("/api/shares", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-id": session.userId,
-        },
         body: JSON.stringify({
           secretId: secret.id,
           recipientId: selectedId,

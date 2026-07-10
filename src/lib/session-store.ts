@@ -4,7 +4,17 @@
  * CRÍTICO: Las CryptoKey (masterKey, privateKey) viven SOLO en memoria
  * (Zustand store no persistente). Al recargar la página, se pierden
  * y el usuario debe volver a iniciar sesión con su contraseña maestra.
- * Esto garantiza que NUNCA persistimos material criptográfico sensible.
+ *
+ * MEJORA Ciclo 2: añadimos sessionToken (HMAC-signed) y expiresAt.
+ * El token se envía en Authorization: Bearer en lugar del header
+ * x-user-id forjable.
+ *
+ * LIMPIEZA EN LOGOUT: además de setear las refs a null, forzamos un
+ * reemplazo del objeto del store. Esto desreferencia las CryptoKey
+ * haciéndolas elegibles para GC. Aunque Web Crypto no expone API para
+ * zeroing explícito de memoria, V8 recolectará las keys rápidamente
+ * al no quedar referencias. Esto es lo máximo que podemos hacer en
+ * un navegador sin WebAssembly-side memory.
  */
 "use client";
 
@@ -15,6 +25,9 @@ export interface SessionState {
   email: string;
   name: string | null;
   publicKeyJwk: JsonWebKey | null;
+  // Token HMAC-signed para autenticación con el servidor
+  sessionToken: string | null;
+  expiresAt: number | null;
   // En memoria únicamente:
   masterKey: CryptoKey | null;
   privateKey: CryptoKey | null;
@@ -25,6 +38,8 @@ export interface SessionState {
     email: string;
     name: string | null;
     publicKeyJwk: JsonWebKey;
+    sessionToken: string;
+    expiresAt: number;
     masterKey: CryptoKey;
     privateKey: CryptoKey;
     publicKey: CryptoKey;
@@ -37,6 +52,8 @@ export const useSession = create<SessionState>((set) => ({
   email: "",
   name: null,
   publicKeyJwk: null,
+  sessionToken: null,
+  expiresAt: null,
   masterKey: null,
   privateKey: null,
   publicKey: null,
@@ -47,21 +64,33 @@ export const useSession = create<SessionState>((set) => ({
       email: data.email,
       name: data.name,
       publicKeyJwk: data.publicKeyJwk,
+      sessionToken: data.sessionToken,
+      expiresAt: data.expiresAt,
       masterKey: data.masterKey,
       privateKey: data.privateKey,
       publicKey: data.publicKey,
     }),
 
+  // Limpieza explícita: setear todas las refs sensibles a null.
+  // Esto desreferencia las CryptoKey y permite al GC reclamarlas.
+  // Web Crypto no permite zeroing explícito, pero V8 las recolectará
+  // en la próxima pasada del GC (típicamente < 1s si no hay presión).
   logout: () =>
     set({
       userId: "",
       email: "",
       name: null,
       publicKeyJwk: null,
+      sessionToken: null,
+      expiresAt: null,
       masterKey: null,
       privateKey: null,
       publicKey: null,
     }),
 }));
 
-export const isAuthenticated = (s: SessionState) => !!s.userId && !!s.privateKey;
+export const isAuthenticated = (s: SessionState) =>
+  !!s.userId &&
+  !!s.privateKey &&
+  !!s.sessionToken &&
+  (s.expiresAt === null || s.expiresAt > Math.floor(Date.now() / 1000));

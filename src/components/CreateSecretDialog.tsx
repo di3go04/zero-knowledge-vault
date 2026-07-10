@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/lib/session-store";
+import { useApi } from "@/lib/api-client";
 import { encryptNewSecret } from "@/lib/crypto-client";
 import { Loader2, Lock, Plus } from "lucide-react";
 
@@ -27,6 +28,7 @@ interface CreateSecretDialogProps {
 export function CreateSecretDialog({ open, onOpenChange, onCreated }: CreateSecretDialogProps) {
   const { toast } = useToast();
   const session = useSession();
+  const { apiFetch } = useApi();
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -46,16 +48,10 @@ export function CreateSecretDialog({ open, onOpenChange, onCreated }: CreateSecr
 
     setBusy(true);
     try {
-      // 1. Cifrar localmente con AES-256-GCM + wrap con la publicKey del owner
       const artifacts = await encryptNewSecret(title, content, session.publicKey);
 
-      // 2. Enviar SOLO blobs al servidor
-      const res = await fetch("/api/secrets", {
+      const res = await apiFetch("/api/secrets", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-id": session.userId,
-        },
         body: JSON.stringify({
           encryptedTitle: artifacts.encryptedTitle,
           titleIv: artifacts.titleIv,

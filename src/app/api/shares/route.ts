@@ -1,30 +1,29 @@
 /**
  * POST /api/shares
+ *   Crea o actualiza un SecretKeyShare.
  *
- * Crea un nuevo SecretKeyShare: almacena la llave AES del secreto
- * ENVUELTA (wrapped) con la llave PÚBLICA RSA del destinatario.
+ * DELETE /api/shares
+ *   Revoca un share existente. Solo el owner del secreto puede revocar.
+ *   Esto es el "offboarding" — si Bob deja el equipo, Alice revoca su
+ *   acceso a todos los secretos que le compartió. Bob ya no podrá
+ *   desenvolver la AES key del secreto (su wrappedKey se borra).
  *
- * El servidor NO puede desenvolverla (no tiene la llave privada del
- * destinatario). Por tanto, aun en caso de brecha, el atacante no
- * obtiene la llave simétrica en claro.
+ * MEJORA Ciclo 2: usa Authorization: Bearer + añade endpoint DELETE.
  *
- * Header: x-user-id (debe ser el owner del secreto)
- *
- * Body:
- *   { secretId, recipientId, wrappedSymmetricKey (base64) }
+ * Body POST: { secretId, recipientId, wrappedSymmetricKey (base64) }
+ * Body DELETE: { secretId, recipientId }
  */
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { validateBase64Blob } from "@/lib/crypto-server";
+import { requireAuth } from "@/lib/auth-helper";
 
-// Un wrappedKey RSA-OAEP-2048 son exactamente 256 bytes
 const WRAPPED_KEY_BYTES = 256;
 
 export async function POST(req: NextRequest) {
-  const ownerId = req.headers.get("x-user-id");
-  if (!ownerId || ownerId.startsWith("decoy-")) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  }
+  const auth = requireAuth(req);
+  if (!auth.ok) return auth.response;
+  const ownerId = auth.userId;
 
   let body: any;
   try {
@@ -41,8 +40,6 @@ export async function POST(req: NextRequest) {
   if (typeof recipientId !== "string" || !recipientId) {
     return NextResponse.json({ error: "recipientId requerido" }, { status: 400 });
   }
-  // Validación estricta: wrappedKey debe ser EXACTAMENTE 256 bytes
-  // (RSA-OAEP-2048 ciphertext). Esto previene inyección de blobs arbitrarios.
   if (
     !validateBase64Blob(wrappedSymmetricKey, WRAPPED_KEY_BYTES, WRAPPED_KEY_BYTES)
   ) {
@@ -54,7 +51,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Verificar que el solicitante es el owner del secreto
   const secret = await db.secret.findUnique({ where: { id: secretId } });
   if (!secret) {
     return NextResponse.json({ error: "Secreto no encontrado" }, { status: 404 });
@@ -66,7 +62,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // No compartir consigo mismo
   if (recipientId === ownerId) {
     return NextResponse.json(
       { error: "No puedes compartir contigo mismo — ya tienes acceso" },
@@ -74,7 +69,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Verificar que el destinatario exista Y tenga keyMaterial (registro completo)
   const recipient = await db.user.findUnique({
     where: { id: recipientId },
     include: { keyMaterial: true },
@@ -83,7 +77,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Destinatario no encontrado" }, { status: 404 });
   }
 
-  // Idempotente: si ya existe, reemplazamos la wrappedKey (rotación de acceso)
   const share = await db.secretKeyShare.upsert({
     where: {
       secretId_recipientId: { secretId, recipientId },
@@ -103,5 +96,66 @@ export async function POST(req: NextRequest) {
     recipientEmail: recipient.email,
     recipientFingerprint: recipient.keyMaterial.publicKeyFingerprint,
     createdAt: share.createdAt,
+  });
+}
+
+// ----------------------- DELETE (revoke share) -----------------------
+export async function DELETE(req: NextRequest) {
+  const auth = requireAuth(req);
+  if (!auth.ok) return auth.response;
+  const ownerId = auth.userId;
+
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+  }
+
+  const { secretId, recipientId } = body ?? {};
+  if (typeof secretId !== "string" || !secretId) {
+    return NextResponse.json({ error: "secretId requerido" }, { status: 400 });
+  }
+  if (typeof recipientId !== "string" || !recipientId) {
+    return NextResponse.json({ error: "recipientId requerido" }, { status: 400 });
+  }
+
+  // Verificar ownership
+  const secret = await db.secret.findUnique({ where: { id: secretId } });
+  if (!secret) {
+    return NextResponse.json({ error: "Secreto no encontrado" }, { status: 404 });
+  }
+  if (secret.ownerId !== ownerId) {
+    return NextResponse.json(
+      { error: "Solo el owner puede revocar shares" },
+      { status: 403 },
+    );
+  }
+
+  // No permitir revocar el share del propio owner (sería perder acceso)
+  if (recipientId === ownerId) {
+    return NextResponse.json(
+      { error: "No puedes revocar tu propio acceso al secreto" },
+      { status: 400 },
+    );
+  }
+
+  // Borrar el share
+  const deleted = await db.secretKeyShare.deleteMany({
+    where: { secretId, recipientId },
+  });
+
+  if (deleted.count === 0) {
+    return NextResponse.json(
+      { error: "No existía un share para ese destinatario" },
+      { status: 404 },
+    );
+  }
+
+  return NextResponse.json({
+    secretId,
+    recipientId,
+    revoked: true,
+    note: "El destinatario ya no puede descifrar NUEVAS peticiones del secreto. Copias descifradas localmente NO pueden ser revocadas.",
   });
 }

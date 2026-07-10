@@ -1,11 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/lib/session-store";
+import { useApi } from "@/lib/api-client";
 import {
   Lock,
   Plus,
@@ -18,6 +29,8 @@ import {
   LogOut,
   KeyRound,
   Clock,
+  Trash2,
+  UserX,
 } from "lucide-react";
 import { CreateSecretDialog } from "./CreateSecretDialog";
 import { ViewSecretDialog, type SecretListItem } from "./ViewSecretDialog";
@@ -27,6 +40,7 @@ export function VaultView() {
   const { toast } = useToast();
   const session = useSession();
   const logout = useSession((s) => s.logout);
+  const { apiFetch } = useApi();
 
   const [secrets, setSecrets] = useState<SecretListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,13 +48,14 @@ export function VaultView() {
   const [viewOpen, setViewOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [selected, setSelected] = useState<SecretListItem | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<SecretListItem | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<SecretListItem | null>(null);
+  const [busyAction, setBusyAction] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/secrets", {
-        headers: { "x-user-id": session.userId },
-      });
+      const res = await apiFetch("/api/secrets");
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Error al cargar");
       setSecrets(data.secrets ?? []);
@@ -53,7 +68,7 @@ export function VaultView() {
     } finally {
       setLoading(false);
     }
-  }, [session.userId, toast]);
+  }, [apiFetch, toast]);
 
   useEffect(() => {
     load();
@@ -66,6 +81,61 @@ export function VaultView() {
   function openShare(s: SecretListItem) {
     setSelected(s);
     setShareOpen(true);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setBusyAction(true);
+    try {
+      const res = await apiFetch(`/api/secrets/${deleteTarget.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Error al borrar");
+      toast({
+        title: "Secreto borrado",
+        description:
+          "Secreto y todas sus shares eliminados del servidor. Copias descifradas localmente por destinatarios previos no pueden ser revocadas.",
+      });
+      setDeleteTarget(null);
+      load();
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Error al borrar",
+        description: err?.message,
+      });
+    } finally {
+      setBusyAction(false);
+    }
+  }
+
+  async function confirmRevoke() {
+    if (!revokeTarget) return;
+    setBusyAction(true);
+    try {
+      const res = await apiFetch(`/api/shares`, {
+        method: "DELETE",
+        body: JSON.stringify({
+          secretId: revokeTarget.id,
+          recipientId: session.userId, // esto es para "compartidos conmigo" — salir del share
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Error al revocar");
+      toast({
+        title: "Has salido del secreto",
+        description: `Ya no verás "${revokeTarget.id.slice(-8)}" en tu bóveda.`,
+      });
+      setRevokeTarget(null);
+      load();
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err?.message,
+      });
+    } finally {
+      setBusyAction(false);
+    }
   }
 
   const mine = secrets.filter((s) => s.ownedByMe);
@@ -89,7 +159,7 @@ export function VaultView() {
               </div>
               <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted-foreground">
                 <KeyRound className="size-3" />
-                Sesión activa con llave privada descifrada en memoria
+                Sesión autenticada con token HMAC · llave privada en memoria
               </div>
             </div>
           </div>
@@ -121,6 +191,7 @@ export function VaultView() {
           loading={loading}
           onOpen={openView}
           onShare={openShare}
+          onDelete={(s) => setDeleteTarget(s)}
           emptyHint="Aún no tienes secretos. Crea el primero con «Nuevo secreto»."
         />
       </div>
@@ -138,6 +209,7 @@ export function VaultView() {
           loading={loading}
           onOpen={openView}
           onShare={() => {}}
+          onLeave={(s) => setRevokeTarget(s)}
           shareable={false}
           emptyHint="Nadie ha compartido secretos contigo todavía."
         />
@@ -147,6 +219,65 @@ export function VaultView() {
       <CreateSecretDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={load} />
       <ViewSecretDialog open={viewOpen} onOpenChange={setViewOpen} secret={selected} />
       <ShareSecretDialog open={shareOpen} onOpenChange={setShareOpen} secret={selected} />
+
+      {/* Confirmar borrado de secreto propio */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="size-4 text-destructive" /> ¿Borrar secreto?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-xs leading-relaxed">
+              Esta acción es irreversible. Se borrarán el secreto cifrado y todas las
+              <strong> shares </strong> compartidas con otros usuarios. Ellos perderán acceso a
+              partir de este momento.
+              <br /><br />
+              <strong className="text-amber-500">Advertencia:</strong> copias que ya descifraron y
+              guardaron localmente no pueden ser revocadas. Si crees que el secreto está
+              comprometido, <strong>cámbialo antes de borrarlo</strong>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busyAction}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={busyAction}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {busyAction ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Trash2 className="mr-2 size-4" />}
+              Borrar definitivamente
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirmar salida de share (compartidos conmigo) */}
+      <AlertDialog open={!!revokeTarget} onOpenChange={(o) => !o && setRevokeTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <UserX className="size-4 text-destructive" /> ¿Salir de este secreto?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-xs leading-relaxed">
+              Tu acceso a este secreto compartido será revocado en el servidor. Ya no aparecerá en
+              tu bóveda ni podrás descifrarlo.
+              <br /><br />
+              El owner puede volver a compartírtelo en el futuro si es necesario.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busyAction}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmRevoke}
+              disabled={busyAction}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {busyAction ? <Loader2 className="mr-2 size-4 animate-spin" /> : <UserX className="mr-2 size-4" />}
+              Salir del secreto
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -156,6 +287,8 @@ function SecretGrid({
   loading,
   onOpen,
   onShare,
+  onDelete,
+  onLeave,
   shareable = true,
   emptyHint,
 }: {
@@ -163,6 +296,8 @@ function SecretGrid({
   loading: boolean;
   onOpen: (s: SecretListItem) => void;
   onShare: (s: SecretListItem) => void;
+  onDelete?: (s: SecretListItem) => void;
+  onLeave?: (s: SecretListItem) => void;
   shareable?: boolean;
   emptyHint: string;
 }) {
@@ -224,18 +359,44 @@ function SecretGrid({
                 <Eye className="mr-1.5 size-3" /> Descifrar
               </Button>
               {shareable ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 flex-1 text-xs"
-                  onClick={() => onShare(s)}
-                >
-                  <Share2 className="mr-1.5 size-3" /> Compartir
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 flex-1 text-xs"
+                    onClick={() => onShare(s)}
+                  >
+                    <Share2 className="mr-1.5 size-3" /> Compartir
+                  </Button>
+                  {onDelete ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => onDelete(s)}
+                      title="Borrar secreto"
+                    >
+                      <Trash2 className="size-3" />
+                    </Button>
+                  ) : null}
+                </>
               ) : (
-                <div className="flex-1 truncate text-[10px] text-muted-foreground" title={s.ownerEmail}>
-                  de {s.ownerEmail}
-                </div>
+                <>
+                  <div className="flex-1 truncate text-[10px] text-muted-foreground" title={s.ownerEmail}>
+                    de {s.ownerEmail}
+                  </div>
+                  {onLeave ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => onLeave(s)}
+                      title="Salir de este secreto"
+                    >
+                      <UserX className="size-3" />
+                    </Button>
+                  ) : null}
+                </>
               )}
             </div>
           </CardContent>

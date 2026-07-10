@@ -1,21 +1,18 @@
 /**
  * GET /api/users/list
  *
- * Devuelve la lista de usuarios registrados (id, email, name, fingerprint)
- * — SIN incluir llaves privadas ni material sensible. Útil para poblar el
- * selector de destinatarios al compartir un secreto, mostrando además
- * la fingerprint para verificación TOFU.
+ * Devuelve la lista de usuarios registrados (id, email, name, fingerprint).
  *
- * Header: x-user-id (debe estar autenticado)
+ * MEJORA Ciclo 2: usa Authorization: Bearer en lugar de x-user-id.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { requireAuth } from "@/lib/auth-helper";
 
 export async function GET(req: NextRequest) {
-  const userId = req.headers.get("x-user-id");
-  if (!userId || userId.startsWith("decoy-")) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  }
+  const auth = requireAuth(req);
+  if (!auth.ok) return auth.response;
+  const userId = auth.userId;
 
   const users = await db.user.findMany({
     where: { id: { not: userId } },
