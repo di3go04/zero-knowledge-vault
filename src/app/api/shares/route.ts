@@ -15,13 +15,14 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { validateBase64Blob } from "@/lib/crypto-server";
 
-const isBase64 = (s: unknown): s is string =>
-  typeof s === "string" && s.length > 0 && /^[A-Za-z0-9+/=_-]+$/.test(s);
+// Un wrappedKey RSA-OAEP-2048 son exactamente 256 bytes
+const WRAPPED_KEY_BYTES = 256;
 
 export async function POST(req: NextRequest) {
   const ownerId = req.headers.get("x-user-id");
-  if (!ownerId) {
+  if (!ownerId || ownerId.startsWith("decoy-")) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
@@ -40,9 +41,15 @@ export async function POST(req: NextRequest) {
   if (typeof recipientId !== "string" || !recipientId) {
     return NextResponse.json({ error: "recipientId requerido" }, { status: 400 });
   }
-  if (!isBase64(wrappedSymmetricKey)) {
+  // Validación estricta: wrappedKey debe ser EXACTAMENTE 256 bytes
+  // (RSA-OAEP-2048 ciphertext). Esto previene inyección de blobs arbitrarios.
+  if (
+    !validateBase64Blob(wrappedSymmetricKey, WRAPPED_KEY_BYTES, WRAPPED_KEY_BYTES)
+  ) {
     return NextResponse.json(
-      { error: "wrappedSymmetricKey debe ser base64 (RSA-OAEP wrapped AES key)" },
+      {
+        error: `wrappedSymmetricKey debe ser base64 de exactamente ${WRAPPED_KEY_BYTES} bytes (RSA-OAEP-2048 wrapped AES key)`,
+      },
       { status: 400 },
     );
   }
@@ -67,9 +74,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Verificar que el destinatario exista
-  const recipient = await db.user.findUnique({ where: { id: recipientId } });
-  if (!recipient) {
+  // Verificar que el destinatario exista Y tenga keyMaterial (registro completo)
+  const recipient = await db.user.findUnique({
+    where: { id: recipientId },
+    include: { keyMaterial: true },
+  });
+  if (!recipient || !recipient.keyMaterial) {
     return NextResponse.json({ error: "Destinatario no encontrado" }, { status: 404 });
   }
 
@@ -91,6 +101,7 @@ export async function POST(req: NextRequest) {
     secretId,
     recipientId,
     recipientEmail: recipient.email,
+    recipientFingerprint: recipient.keyMaterial.publicKeyFingerprint,
     createdAt: share.createdAt,
   });
 }

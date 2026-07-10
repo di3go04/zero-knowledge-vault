@@ -183,6 +183,31 @@ const SECURITY_GUARANTEES = [
     title: "Aislamiento de Llave Maestra",
     desc: "La masterKey se deriva con PBKDF2 (600.000 iter, SHA-256, salt único por usuario) y se marca como NO extraíble. Vive solo en memoria del navegador. Al cerrar/recargar la pestaña, se pierde y exige re-login.",
   },
+  {
+    icon: ShieldCheck,
+    title: "Prueba de Posesión (PoP) en registro",
+    desc: "El cliente firma {email, fingerprint, salt} con RSA-PSS antes de enviarlo. El servidor verifica la firma con la publicKey declarada antes de almacenar nada. Esto previene sustitución de publicKey: nadie puede registrar una cuenta usando la publicKey de otra persona.",
+  },
+  {
+    icon: EyeOff,
+    title: "Anti-enumeración de emails (login decoy)",
+    desc: "Si el email NO existe, el servidor genera material criptográfico decoy determinista (HMAC-SHA-256 del email) con la misma estructura que un usuario real. El cliente ejecuta PBKDF2 + AES-GCM y falla con tag inválido — idéntico a contraseña incorrecta. El atacante no puede distinguir ambos casos.",
+  },
+  {
+    icon: KeyRound,
+    title: "TOFU con fingerprint de llaves públicas",
+    desc: "Cada publicKey tiene una huella SHA-256 (hex). El cliente computa la huella localmente y la compara con la que el servidor devuelve. Si no coinciden, el servidor está sustituyendo llaves (MITM activo) y la operación se bloquea. La huella debe verificarse fuera de banda con el destinatario para máxima seguridad.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Validación server-side estricta de parámetros",
+    desc: "kdfIterations ∈ [310.000, 1.000.000], salt ∈ [16, 64] bytes, IVs exactamente 12 bytes, blobs ≤ 64 KiB, JWKs ≤ 4 KiB, wrappedKeys exactamente 256 bytes (RSA-2048). Previene DoS y parámetros criptográficos degenerados.",
+  },
+  {
+    icon: KeyRound,
+    title: "Normalización Unicode NFC de contraseñas",
+    desc: "Toda contraseña se normaliza a NFC antes de PBKDF2. Esto evita bloqueos accidentales cuando un usuario registra con caffè (NFC) y luego introduce café (NFD) — dos secuencias de bytes distintas para el mismo caracter visual.",
+  },
 ];
 
 const DB_SCHEMA = [
@@ -199,11 +224,14 @@ const DB_SCHEMA = [
     table: "UserKeyMaterial",
     rows: [
       { col: "userId", type: "String (FK)", clear: "—", note: "Relación 1:1 con User" },
-      { col: "kdfSalt", type: "String (base64)", clear: "SÍ (público)", note: "Salt para PBKDF2 — no es secreto" },
-      { col: "kdfIterations", type: "Int", clear: "SÍ", note: "600.000 — no es secreto" },
-      { col: "publicKeyJwk", type: "String (JSON)", clear: "SÍ (público)", note: "Llave pública RSA-OAEP — pública por definición" },
-      { col: "encryptedPrivateKeyJwk", type: "String (base64)", clear: "NO 🔒", note: "AES-256-GCM(masterKey, JWK(privKey)) — el servidor NO puede descifrar" },
-      { col: "privateKeyIv", type: "String (base64)", clear: "SÍ (público)", note: "IV de AES-GCM — público por diseño" },
+      { col: "kdfSalt", type: "String (base64, 16–64 B)", clear: "SÍ (público)", note: "Salt para PBKDF2 — no es secreto, validado server-side" },
+      { col: "kdfIterations", type: "Int [310k–1M]", clear: "SÍ", note: "Validado server-side en rango OWASP — anti-DoS" },
+      { col: "publicKeyJwk", type: "String (JSON ≤4 KB)", clear: "SÍ (público)", note: "Llave pública RSA-OAEP + RSA-PSS — pública por definición" },
+      { col: "publicKeyFingerprint", type: "String (hex)", clear: "SÍ (público)", note: "SHA-256 del JWK canonizado — para TOFU y detección de sustitución" },
+      { col: "popSignature", type: "String (base64)", clear: "SÍ (público)", note: "Firma RSA-PSS de {email, fingerprint, salt} — prueba que el cliente posee la privateKey" },
+      { col: "popSignatureHash", type: "String", clear: "SÍ", note: "Algoritmo de hash usado para PoP — auditabilidad" },
+      { col: "encryptedPrivateKeyJwk", type: "String (base64 ≤64 KB)", clear: "NO 🔒", note: "AES-256-GCM(masterKey, JWK(privKey)) — el servidor NO puede descifrar" },
+      { col: "privateKeyIv", type: "String (base64, 12 B)", clear: "SÍ (público)", note: "IV de AES-GCM — público por diseño, validado server-side" },
     ],
   },
   {

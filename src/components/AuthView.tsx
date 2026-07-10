@@ -53,7 +53,7 @@ export function AuthView() {
       // 1. Todo el trabajo criptográfico en el cliente
       const artifacts = await performRegistration(regEmail, regPass);
 
-      // 2. Enviar SOLO blobs al servidor
+      // 2. Enviar SOLO blobs al servidor — incluyendo PoP + fingerprint
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -63,6 +63,8 @@ export function AuthView() {
           kdfSalt: artifacts.kdfSalt,
           kdfIterations: artifacts.kdfIterations,
           publicKeyJwk: artifacts.publicKeyJwk,
+          publicKeyFingerprint: artifacts.publicKeyFingerprint,
+          popSignature: artifacts.popSignature,
           encryptedPrivateKeyJwk: artifacts.encryptedPrivateKey.encryptedJwk,
           privateKeyIv: artifacts.encryptedPrivateKey.iv,
         }),
@@ -86,7 +88,7 @@ export function AuthView() {
 
       toast({
         title: "Registro exitoso",
-        description: "Tu llave privada se cifró con tu llave maestra antes de enviarse. El servidor nunca vio ninguno de los dos en claro.",
+        description: "Llave privada cifrada con tu llave maestra (AES-256-GCM) + firma PoP verificada por el servidor (RSA-PSS). El servidor nunca vio ninguno de los dos en claro.",
       });
 
       setRegEmail("");
@@ -109,7 +111,10 @@ export function AuthView() {
     if (logBusy) return;
     setLogBusy(true);
     try {
-      // 1. Pedir al servidor el material criptográfico PÚBLICO del usuario
+      // 1. Pedir al servidor el material criptográfico PÚBLICO del usuario.
+      //    Si el email NO existe, el servidor devuelve un DECOY con la misma
+      //    estructura — el cliente no puede distinguirlo de un usuario real
+      //    hasta que el descifrado AES-GCM falle con tag inválido.
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -120,7 +125,9 @@ export function AuthView() {
         throw new Error(data?.error ?? "Error al iniciar sesión");
       }
 
-      // 2. Derivar masterKey y descifrar la privateKey LOCALMENTE
+      // 2. Derivar masterKey y descifrar la privateKey LOCALMENTE.
+      //    Para un decoy, AES-GCM lanzará una excepción (tag inválido) —
+      //    mismo comportamiento que contraseña incorrecta.
       const { masterKey, privateKey } = await performLogin(
         logPass,
         data.kdfSalt,
@@ -150,10 +157,12 @@ export function AuthView() {
       setLogEmail("");
       setLogPass("");
     } catch (err: any) {
+      // Mensaje uniforme — no revelamos si el email existe o no
       toast({
         variant: "destructive",
-        title: "Error de autenticación",
-        description: err?.message ?? "Credenciales inválidas",
+        title: "No se pudo iniciar sesión",
+        description:
+          "Email o contraseña maestra incorrectos. Recuerda: el servidor nunca valida la contraseña, solo devuelve blobs — el descifrado ocurre en tu navegador.",
       });
     } finally {
       setLogBusy(false);

@@ -72,11 +72,22 @@ export function normalizePassword(password: string): string {
  * Canonicaliza una JWK para que su hash sea determinista independientemente
  * del orden de claves o de espacios en blanco. Devuelve un JSON con claves
  * ordenadas alfabéticamente y sin espacios.
+ *
+ * Se eliminan los campos `key_ops`, `ext` y `alg` antes de canonicalizar
+ * porque son metadatos de uso, no parte de la key material. Dos JWKs
+ * representando el mismo par RSA pero con distintos `alg` (RSA-OAEP-256
+ * vs RSA-OAEP) deben producir la misma fingerprint.
  */
 export function canonicalJwkString(jwk: JsonWebKey): string {
+  const {
+    key_ops: _kops,
+    ext: _ext,
+    alg: _alg,
+    ...material
+  } = jwk;
   const sorted: Record<string, unknown> = {};
-  for (const k of Object.keys(jwk).sort()) {
-    sorted[k] = (jwk as Record<string, unknown>)[k];
+  for (const k of Object.keys(material).sort()) {
+    sorted[k] = (material as Record<string, unknown>)[k];
   }
   return JSON.stringify(sorted);
 }
@@ -176,6 +187,17 @@ export async function aesDecrypt(
 //    - RSA-OAEP: cifrado / wrapping de llaves AES
 //    - RSA-PSS:  firma de prueba-de-posesión (PoP) en el registro
 // ---------------------------------------------------------------------------
+/**
+ * Genera el par RSA-OAEP. Web Crypto NO permite combinar `sign`/`verify`
+ * con `encrypt`/`decrypt` en una sola generateKey() para RSA-OAEP, así
+ * que generamos solo los usos de cifrado aquí. La firma PoP se realiza
+ * re-importando la JWK privada como RSA-PSS (ver signPop más abajo),
+ * usando la misma key material.
+ *
+ * Esto es válido porque matemáticamente un par RSA es el mismo par de
+ * enteros (n, e, d) independientemente del padding usado en una
+ * operación concreta. La restricción de Web Crypto es solo de API.
+ */
 export async function generateRsaKeyPair(): Promise<CryptoKeyPair> {
   return crypto.subtle.generateKey(
     {
@@ -185,10 +207,7 @@ export async function generateRsaKeyPair(): Promise<CryptoKeyPair> {
       hash: "SHA-256",
     },
     true, // extraíble: necesitamos exportar la llave privada para cifrarla
-    // Importante: declarar TODOS los usos que usaremos después al importar
-    // para que el campo `key_ops` de la JWK exportada sea compatible.
-    // Incluimos sign/verify para RSA-PSS (proof-of-possession en registro).
-    ["encrypt", "decrypt", "wrapKey", "unwrapKey", "sign", "verify"],
+    ["encrypt", "decrypt", "wrapKey", "unwrapKey"],
   );
 }
 
@@ -202,11 +221,21 @@ export async function exportPrivateKeyJwk(key: CryptoKey): Promise<JsonWebKey> {
 
 /**
  * Limpia campos opcionales de la JWK que pueden causar inconsistencias
- * con el parámetro `usages` de importKey. Específicamente `key_ops`,
- * que si está presente debe ser superconjunto de los usos solicitados.
+ * con el parámetro `usages` o el algoritmo de importKey.
+ * Específicamente:
+ *   - key_ops: debe ser superconjunto de los usos solicitados.
+ *   - ext: debe coincidir con el flag extractable solicitado.
+ *   - alg: si está presente, debe coincidir con el algoritmo de importKey.
+ *     Como usamos la misma JWK para RSA-OAEP y RSA-PSS, eliminamos alg
+ *     para evitar el mismatch.
  */
 function sanitizeJwk(jwk: JsonWebKey): JsonWebKey {
-  const { key_ops: _ignoredKeyOps, ext: _ignoredExt, ...rest } = jwk;
+  const {
+    key_ops: _ignoredKeyOps,
+    ext: _ignoredExt,
+    alg: _ignoredAlg,
+    ...rest
+  } = jwk;
   return rest;
 }
 
@@ -214,10 +243,13 @@ export async function importPublicKeyJwk(jwk: JsonWebKey): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     "jwk",
     sanitizeJwk(jwk),
-    // Multi-algorithm: RSA-OAEP para wrapping, RSA-PSS para verificación PoP.
-    [{ name: "RSA-OAEP", hash: "SHA-256" }, { name: "RSA-PSS", hash: "SHA-256" }],
+    // Solo RSA-OAEP para wrapping de llaves AES.
+    // La verificación PoP se hace en el servidor (no aquí).
+    // Si en el futuro el cliente necesita verificar PoP, se importará
+    // por separado como RSA-PSS.
+    { name: "RSA-OAEP", hash: "SHA-256" },
     true,
-    ["encrypt", "wrapKey", "verify"],
+    ["encrypt", "wrapKey"],
   );
 }
 
@@ -225,11 +257,11 @@ export async function importPrivateKeyJwk(jwk: JsonWebKey): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     "jwk",
     sanitizeJwk(jwk),
-    // Multi-algorithm: la misma llave RSA sirve para RSA-OAEP (decrypt/unwrap)
-    // y RSA-PSS (sign). Web Crypto permite declarar ambos algoritmos en importKey.
-    [{ name: "RSA-OAEP", hash: "SHA-256" }, { name: "RSA-PSS", hash: "SHA-256" }],
+    // Solo RSA-OAEP para unwrap de llaves AES.
+    // La firma PoP se hace re-importando la JWK como RSA-PSS en signPop.
+    { name: "RSA-OAEP", hash: "SHA-256" },
     false, // no extraíble: la llave privada en memoria no debe poder exportarse de nuevo
-    ["decrypt", "unwrapKey", "sign"],
+    ["decrypt", "unwrapKey"],
   );
 }
 
@@ -285,6 +317,12 @@ export function buildPopMessage(
 /**
  * Firma el mensaje PoP con RSA-PSS (salt length = 32 bytes).
  * Devuelve la firma en base64.
+ *
+ * IMPORTANTE: Web Crypto no permite usar la misma CryptoKey para
+ * RSA-OAEP (decrypt) y RSA-PSS (sign) simultáneamente. Por eso
+ * exportamos la privateKey a JWK y la re-importamos como RSA-PSS
+ * con uso `sign`. Es la misma key material (mismos enteros n, d),
+ * solo cambia el algoritmo de padding aplicado en esta operación.
  */
 export async function signPop(
   privateKey: CryptoKey,
@@ -292,10 +330,23 @@ export async function signPop(
   fingerprintHex: string,
   kdfSaltB64: string,
 ): Promise<string> {
+  // 1. Exportar la privateKey a JWK (es extraíble por diseño en generateKey)
+  const jwk = await exportPrivateKeyJwk(privateKey);
+
+  // 2. Re-importar como RSA-PSS con uso `sign`
+  const signingKey = await crypto.subtle.importKey(
+    "jwk",
+    sanitizeJwk(jwk),
+    { name: "RSA-PSS", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+
+  // 3. Firmar
   const msg = buildPopMessage(email, fingerprintHex, kdfSaltB64);
   const sig = await crypto.subtle.sign(
     { name: "RSA-PSS", saltLength: 32 },
-    privateKey,
+    signingKey,
     msg as BufferSource,
   );
   return bufToBase64(sig);
@@ -429,7 +480,15 @@ export async function performRegistration(
   // 7. Firma PoP: demuestra que poseemos la privateKey correspondiente
   //    a la publicKey que estamos registrando. El servidor verificará
   //    esta firma ANTES de almacenar nada.
-  const popSignature = await signPop(rsaPair.privateKey, email, fingerprint, kdfSaltB64);
+  //    IMPORTANTE: normalizamos el email a lowercase + trim para que la
+  //    firma coincida con la verificación server-side.
+  const normalizedEmail = email.toLowerCase().trim();
+  const popSignature = await signPop(
+    rsaPair.privateKey,
+    normalizedEmail,
+    fingerprint,
+    kdfSaltB64,
+  );
 
   return {
     kdfSalt: kdfSaltB64,

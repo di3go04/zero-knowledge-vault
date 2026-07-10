@@ -1,24 +1,37 @@
 /**
  * GET /api/users/lookup?email=...
  *
- * Busca un usuario por email y devuelve SU ID + SU LLAVE PÚBLICA.
- * Esto es necesario para que un cliente pueda envolver (wrap) una
- * llave AES con la llave pública del destinatario antes de compartir.
+ * Busca un usuario por email y devuelve SU ID + SU LLAVE PÚBLICA + SU
+ * FINGERPRINT. Esto es necesario para que un cliente pueda:
+ *   1. envolver (wrap) una llave AES con la publicKey del destinatario
+ *   2. verificar TOFU comparando la fingerprint recibida con la que el
+ *      destinatario le comunicó fuera de banda
  *
  * La llave pública ES pública por definición — exponerla no rompe
- * el modelo Zero-Knowledge.
+ * el modelo Zero-Knowledge. La fingerprint es un hash de la publicKey,
+ * también público por definición.
+ *
+ * MEJORA Ciclo 1 — Anti-enumeración:
+ *   Si el email NO existe, devolvemos 404 con un mensaje genérico.
+ *   No generamos decoy aquí porque la fingerprint debe ser verificable
+ *   fuera de banda por el destinatario real, y un decoy rompería el
+ *   TOFU. En su lugar, confiamos en rate-limiting (futuro ciclo) para
+ *   mitigar la enumeración en este endpoint.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export async function GET(req: NextRequest) {
   const email = req.nextUrl.searchParams.get("email");
-  if (!email) {
-    return NextResponse.json({ error: "Parámetro 'email' requerido" }, { status: 400 });
+  if (!email || !EMAIL_RE.test(email)) {
+    return NextResponse.json({ error: "Parámetro 'email' inválido" }, { status: 400 });
   }
+  const normalizedEmail = email.toLowerCase().trim();
 
   const user = await db.user.findUnique({
-    where: { email },
+    where: { email: normalizedEmail },
     include: { keyMaterial: true },
   });
 
@@ -31,5 +44,6 @@ export async function GET(req: NextRequest) {
     email: user.email,
     name: user.name,
     publicKeyJwk: JSON.parse(user.keyMaterial.publicKeyJwk),
+    publicKeyFingerprint: user.keyMaterial.publicKeyFingerprint,
   });
 }

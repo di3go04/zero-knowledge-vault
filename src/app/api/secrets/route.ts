@@ -19,13 +19,18 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import {
+  IV_EXPECTED_BYTES,
+  MAX_BLOB_BYTES,
+  validateBase64Blob,
+} from "@/lib/crypto-server";
 
-const isBase64 = (s: unknown): s is string =>
-  typeof s === "string" && s.length > 0 && /^[A-Za-z0-9+/=_-]+$/.test(s);
+// Un wrappedKey RSA-OAEP-2048 son exactamente 256 bytes
+const WRAPPED_KEY_BYTES = 256;
 
 function getUserId(req: NextRequest): string | null {
   const id = req.headers.get("x-user-id");
-  return id && id.length > 0 ? id : null;
+  return id && id.length > 0 && !id.startsWith("decoy-") ? id : null;
 }
 
 // ----------------------- GET (list) -----------------------
@@ -83,15 +88,39 @@ export async function POST(req: NextRequest) {
 
   const { encryptedTitle, titleIv, encryptedData, dataIv, wrappedKeyForOwner } = body ?? {};
 
-  // Validación estricta: TODO debe ser blob cifrado. Nada en claro.
-  const fields = { encryptedTitle, titleIv, encryptedData, dataIv, wrappedKeyForOwner };
-  for (const [k, v] of Object.entries(fields)) {
-    if (!isBase64(v)) {
-      return NextResponse.json(
-        { error: `Campo '${k}' debe ser base64 (blob cifrado). El servidor rechaza cualquier valor en claro.` },
-        { status: 400 },
-      );
-    }
+  // -------- Validación estricta: TODO debe ser blob cifrado + tamaños --------
+  // IVs: exactamente 12 bytes (GCM recomendado)
+  if (!validateBase64Blob(titleIv, IV_EXPECTED_BYTES, IV_EXPECTED_BYTES)) {
+    return NextResponse.json(
+      { error: `titleIv debe ser base64 de exactamente ${IV_EXPECTED_BYTES} bytes` },
+      { status: 400 },
+    );
+  }
+  if (!validateBase64Blob(dataIv, IV_EXPECTED_BYTES, IV_EXPECTED_BYTES)) {
+    return NextResponse.json(
+      { error: `dataIv debe ser base64 de exactamente ${IV_EXPECTED_BYTES} bytes` },
+      { status: 400 },
+    );
+  }
+  // Ciphertexts: 1 byte mínimo (no vacío), 64 KiB máximo (anti-DoS)
+  if (!validateBase64Blob(encryptedTitle, 1, MAX_BLOB_BYTES)) {
+    return NextResponse.json(
+      { error: `encryptedTitle debe ser base64 (blob cifrado) ≤ ${MAX_BLOB_BYTES} bytes` },
+      { status: 400 },
+    );
+  }
+  if (!validateBase64Blob(encryptedData, 1, MAX_BLOB_BYTES)) {
+    return NextResponse.json(
+      { error: `encryptedData debe ser base64 (blob cifrado) ≤ ${MAX_BLOB_BYTES} bytes` },
+      { status: 400 },
+    );
+  }
+  // wrappedKey: RSA-OAEP-2048 → exactamente 256 bytes
+  if (!validateBase64Blob(wrappedKeyForOwner, WRAPPED_KEY_BYTES, WRAPPED_KEY_BYTES)) {
+    return NextResponse.json(
+      { error: `wrappedKeyForOwner debe ser base64 de exactamente ${WRAPPED_KEY_BYTES} bytes (RSA-OAEP-2048)` },
+      { status: 400 },
+    );
   }
 
   // Verificar que el usuario exista (defense in depth)
