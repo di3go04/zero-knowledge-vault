@@ -100,10 +100,24 @@ export async function POST(req: NextRequest) {
 }
 
 // ----------------------- DELETE (revoke share) -----------------------
+/**
+ * Dos modos de revocación:
+ *
+ * 1. OWNER revoca acceso a un destinatario:
+ *    El solicitante es el owner del secreto, recipientId es otro usuario.
+ *    Caso de uso: offboarding — Bob deja el equipo, Alice le revoca acceso.
+ *
+ * 2. DESTINATARIO se auto-saca del secreto:
+ *    El solicitante es el propio recipientId. No es el owner.
+ *    Caso de uso: Bob decide salir voluntariamente de un secreto compartido.
+ *
+ * El owner NO puede revocar su propio acceso (tendría que borrar el secreto).
+ * El destinatario solo puede revocar SU share, no el de otros.
+ */
 export async function DELETE(req: NextRequest) {
   const auth = requireAuth(req);
   if (!auth.ok) return auth.response;
-  const ownerId = auth.userId;
+  const requesterId = auth.userId;
 
   let body: any;
   try {
@@ -120,24 +134,36 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "recipientId requerido" }, { status: 400 });
   }
 
-  // Verificar ownership
   const secret = await db.secret.findUnique({ where: { id: secretId } });
   if (!secret) {
     return NextResponse.json({ error: "Secreto no encontrado" }, { status: 404 });
   }
-  if (secret.ownerId !== ownerId) {
+
+  const isOwner = secret.ownerId === requesterId;
+  const isSelfLeave = recipientId === requesterId;
+
+  // Validar permisos:
+  // - Si es owner: puede revocar cualquier share excepto el suyo propio
+  // - Si NO es owner: solo puede revocar su propio share (self-leave)
+  if (!isOwner && !isSelfLeave) {
     return NextResponse.json(
-      { error: "Solo el owner puede revocar shares" },
+      { error: "Solo el owner puede revocar shares de otros usuarios. Como destinatario, solo puedes salir del secreto (recipientId = tu userId)." },
       { status: 403 },
     );
   }
 
-  // No permitir revocar el share del propio owner (sería perder acceso)
-  if (recipientId === ownerId) {
+  // Owner no puede revocar su propio acceso (tendría que borrar el secreto)
+  if (isOwner && isSelfLeave) {
     return NextResponse.json(
-      { error: "No puedes revocar tu propio acceso al secreto" },
+      { error: "No puedes revocar tu propio acceso al secreto. Borra el secreto completo si lo necesitas." },
       { status: 400 },
     );
+  }
+
+  // Verificar que el destinatario exista
+  const recipient = await db.user.findUnique({ where: { id: recipientId } });
+  if (!recipient) {
+    return NextResponse.json({ error: "Destinatario no encontrado" }, { status: 404 });
   }
 
   // Borrar el share
@@ -156,6 +182,7 @@ export async function DELETE(req: NextRequest) {
     secretId,
     recipientId,
     revoked: true,
+    mode: isOwner ? "owner-revoke" : "self-leave",
     note: "El destinatario ya no puede descifrar NUEVAS peticiones del secreto. Copias descifradas localmente NO pueden ser revocadas.",
   });
 }

@@ -31,10 +31,12 @@ import {
   Clock,
   Trash2,
   UserX,
+  KeyRound as RotateIcon,
 } from "lucide-react";
 import { CreateSecretDialog } from "./CreateSecretDialog";
 import { ViewSecretDialog, type SecretListItem } from "./ViewSecretDialog";
 import { ShareSecretDialog } from "./ShareSecretDialog";
+import { RotatePasswordDialog } from "./RotatePasswordDialog";
 
 export function VaultView() {
   const { toast } = useToast();
@@ -51,6 +53,7 @@ export function VaultView() {
   const [deleteTarget, setDeleteTarget] = useState<SecretListItem | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<SecretListItem | null>(null);
   const [busyAction, setBusyAction] = useState(false);
+  const [rotateOpen, setRotateOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -68,7 +71,7 @@ export function VaultView() {
     } finally {
       setLoading(false);
     }
-  }, [apiFetch, toast]);
+  }, [toast]);
 
   useEffect(() => {
     load();
@@ -171,6 +174,14 @@ export function VaultView() {
             <Button size="sm" onClick={() => setCreateOpen(true)}>
               <Plus className="mr-2 size-3.5" /> Nuevo secreto
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRotateOpen(true)}
+              title="Rotar contraseña maestra"
+            >
+              <RotateIcon className="mr-2 size-3.5" /> Rotar clave
+            </Button>
             <Button variant="ghost" size="sm" onClick={logout}>
               <LogOut className="mr-2 size-3.5" /> Salir
             </Button>
@@ -219,6 +230,19 @@ export function VaultView() {
       <CreateSecretDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={load} />
       <ViewSecretDialog open={viewOpen} onOpenChange={setViewOpen} secret={selected} />
       <ShareSecretDialog open={shareOpen} onOpenChange={setShareOpen} secret={selected} />
+      <RotatePasswordDialog
+        open={rotateOpen}
+        onOpenChange={setRotateOpen}
+        onRotated={() => {
+          // Tras rotar, la masterKey en memoria sigue siendo la vieja.
+          // Forzamos logout para que el usuario re-login con la nueva.
+          logout();
+          toast({
+            title: "Sesión cerrada",
+            description: "Inicia sesión con tu nueva contraseña maestra.",
+          });
+        }}
+      />
 
       {/* Confirmar borrado de secreto propio */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>

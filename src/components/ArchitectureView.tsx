@@ -208,6 +208,38 @@ const SECURITY_GUARANTEES = [
     title: "Normalización Unicode NFC de contraseñas",
     desc: "Toda contraseña se normaliza a NFC antes de PBKDF2. Esto evita bloqueos accidentales cuando un usuario registra con caffè (NFC) y luego introduce café (NFD) — dos secuencias de bytes distintas para el mismo caracter visual.",
   },
+  // ---- Ciclo 2 ----
+  {
+    icon: ShieldCheck,
+    title: "Autenticación con token HMAC-signed (Ciclo 2)",
+    desc: "Reemplazo del header x-user-id (forjable) por tokens HS256 con expiración de 8h. El servidor valida cada request autenticada con timingSafeEqual para prevenir timing attacks. Stateless — no requiere almacenamiento server-side.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Rate-limiting anti-fuerza bruta (Ciclo 2)",
+    desc: "/api/auth/login está limitado a 5 intentos por IP+email cada 15 min. Responde 429 con Retry-After. Previene que un atacante obtenga material para brute-force offline masivamente.",
+  },
+  {
+    icon: EyeOff,
+    title: "Borrado de secretos con cascada (Ciclo 2)",
+    desc: "DELETE /api/secrets/[id] borra el secreto y todas sus SecretKeyShare (onDelete: Cascade). Solo el owner puede borrar. Copias descifradas localmente no pueden revocarse — el owner debe rotar el secreto si está comprometido.",
+  },
+  {
+    icon: Users,
+    title: "Offboarding bidireccional (Ciclo 2)",
+    desc: "DELETE /api/shares soporta dos modos: (1) owner revoca acceso a un destinatario, (2) destinatario se auto-saca del secreto. El share se elimina de la BD; el destinatario ya no puede descifrar nuevas peticiones.",
+  },
+  {
+    icon: KeyRound,
+    title: "Limpieza explícita en logout (Ciclo 2)",
+    desc: "Al hacer logout, todas las refs a CryptoKey se setean a null explícitamente, desreferenciándolas para que el GC de V8 las recolecte. Web Crypto no expone API para zeroing, pero sin refs las keys se recogen en la próxima pasada del GC.",
+  },
+  // ---- Ciclo 3 ----
+  {
+    icon: KeyRound,
+    title: "Rotación de contraseña maestra (Ciclo 3)",
+    desc: "POST /api/auth/rotate permite cambiar la contraseña maestra sin perder access a secretos existentes. Se genera nuevo salt, se deriva nueva masterKey, y se re-cifra la MISMA privateKey RSA. Las wrappedKeys existentes siguen siendo válidas porque la publicKey no cambió. El servidor verifica PoP con la privateKey actual antes de aceptar la rotación.",
+  },
 ];
 
 const DB_SCHEMA = [

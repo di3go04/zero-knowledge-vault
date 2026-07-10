@@ -606,3 +606,144 @@ export async function shareSecretWithRecipient(
 
   return bufToBase64(rewrapped);
 }
+
+// ---------------------------------------------------------------------------
+// 12. Orquestación de alto nivel — Rotación de contraseña maestra
+// ---------------------------------------------------------------------------
+/**
+ * Rotación de contraseña maestra.
+ *
+ * Cliente debe proporcionar:
+ *   - oldPassword: para descifrar la privateKey actual y verificar que
+ *     el usuario legítimo es quien rota (no un atacante con sesión abierta).
+ *   - newPassword: la nueva contraseña maestra.
+ *   - Los artifacts del login actual (salt, iterations, encryptedPrivateKey,
+ *     iv) para descifrar la privateKey.
+ *
+ * Salida: artifacts listos para enviar al servidor:
+ *   - newKdfSalt, newKdfIterations
+ *   - newEncryptedPrivateKey (la MISMA privateKey, re-cifrada con la nueva
+ *     masterKey)
+ *   - newPopSignature (firma sobre el nuevo salt, con la misma privateKey)
+ *
+ * CRÍTICO: la privateKey RSA NO cambia. Por tanto:
+ *   - Las wrappedKeys existentes siguen siendo válidas.
+ *   - Los shares existentes siguen funcionando.
+ *   - Solo cambia el "candado" (masterKey) que protege la privateKey en BD.
+ *
+ * Si el atacante tiene la masterKey VIEJA pero el usuario rota antes de que
+ * el atacante obtenga la BD, la masterKey vieja ya no sirve para nada.
+ */
+export interface RotationArtifacts {
+  newKdfSalt: string;
+  newKdfIterations: number;
+  newEncryptedPrivateKey: EncryptedPrivateKey;
+  newPopSignature: string;
+  // En memoria (actualizar el store):
+  newMasterKey: CryptoKey;
+}
+
+export async function performPasswordRotation(params: {
+  oldPassword: string;
+  newPassword: string;
+  email: string;
+  currentKdfSaltB64: string;
+  currentKdfIterations: number;
+  currentEncryptedPrivateKeyJwkB64: string;
+  currentPrivateKeyIvB64: string;
+}): Promise<RotationArtifacts> {
+  const {
+    oldPassword,
+    newPassword,
+    email,
+    currentKdfSaltB64,
+    currentKdfIterations,
+    currentEncryptedPrivateKeyJwkB64,
+    currentPrivateKeyIvB64,
+  } = params;
+
+  // 1. Descifrar la privateKey JWK con la contraseña VIEJA.
+  //    Obtenemos la JWK en claro (no una CryptoKey) porque necesitamos:
+  //    (a) re-cifrarla con la nueva masterKey
+  //    (b) construir la publicKey JWK desde ella (para fingerprint)
+  //    (c) importarla temporalmente como RSA-PSS para firmar PoP
+  const oldMasterKey = await deriveMasterKey(
+    oldPassword,
+    base64ToBuf(currentKdfSaltB64),
+    currentKdfIterations,
+  );
+  const privateKeyJwkStr = await aesDecrypt(
+    oldMasterKey,
+    currentEncryptedPrivateKeyJwkB64,
+    currentPrivateKeyIvB64,
+  );
+  const privateKeyJwk = JSON.parse(privateKeyJwkStr) as JsonWebKey;
+
+  // 2. Generar nuevo salt y derivar nueva masterKey
+  const newSalt = randomBytes(SALT_LENGTH);
+  const newMasterKey = await deriveMasterKey(newPassword, newSalt);
+
+  // 3. Re-cifrar la MISMA privateKey JWK con la nueva masterKey
+  const { ciphertext: newEncryptedJwk, iv: newIv } = await aesEncrypt(
+    newMasterKey,
+    privateKeyJwkStr,
+  );
+  const newEncryptedPrivateKey: EncryptedPrivateKey = {
+    encryptedJwk: newEncryptedJwk,
+    iv: newIv,
+  };
+
+  // 4. Construir publicKey JWK desde la privateKey JWK (mismo n, e)
+  const publicKeyJwk: JsonWebKey = {
+    kty: privateKeyJwk.kty,
+    n: privateKeyJwk.n,
+    e: privateKeyJwk.e,
+  };
+
+  // 5. Fingerprint de la publicKey (para PoP message)
+  const newKdfSaltB64 = bufToBase64(newSalt);
+  const fingerprint = await publicKeyFingerprint(publicKeyJwk);
+
+  // 6. Importar temporalmente la privateKey como RSA-PSS para firmar PoP
+  const normalizedEmail = email.toLowerCase().trim();
+  const signingKey = await crypto.subtle.importKey(
+    "jwk",
+    sanitizeJwk(privateKeyJwk),
+    { name: "RSA-PSS", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const msg = buildPopMessage(normalizedEmail, fingerprint, newKdfSaltB64);
+  const sig = await crypto.subtle.sign(
+    { name: "RSA-PSS", saltLength: 32 },
+    signingKey,
+    msg as BufferSource,
+  );
+  const newPopSignature = bufToBase64(sig);
+
+  return {
+    newKdfSalt: newKdfSaltB64,
+    newKdfIterations: KDF_ITERATIONS,
+    newEncryptedPrivateKey,
+    newPopSignature,
+    newMasterKey,
+  };
+}
+
+/**
+ * Construye una publicKey JWK a partir de una privateKey JWK.
+ * En RSA, la publicKey contiene los mismos `n` y `e` que la privateKey,
+ * pero sin `d`, `p`, `q`, `dp`, `dq`, `qi`.
+ *
+ * Web Crypto no permite "derivar" la publicKey desde una CryptoKey privada
+ * directamente, pero podemos exportar la privateKey a JWK y construir la
+ * publicKey JWK manualmente conservando solo los campos públicos.
+ */
+async function derivePublicJwkFromPrivate(privateKey: CryptoKey): Promise<JsonWebKey> {
+  const privJwk = await exportPrivateKeyJwk(privateKey);
+  return {
+    kty: privJwk.kty,
+    n: privJwk.n,
+    e: privJwk.e,
+  };
+}
