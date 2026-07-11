@@ -135,13 +135,14 @@ export function buildPopMessage(
 async function importRsaPublicKeyForVerify(jwk: JsonWebKey): Promise<CryptoKey> {
   // Sanitizar key_ops / ext / alg para evitar inconsistencias
   const { key_ops: _kops, ext: _ext, alg: _alg, ...clean } = jwk;
-  return subtle.importKey(
+  const result = await subtle.importKey(
     "jwk",
     clean,
     { name: "RSA-PSS", hash: "SHA-256" },
     true,
     ["verify"],
   );
+  return result as unknown as CryptoKey;
 }
 
 /**
@@ -168,8 +169,8 @@ export async function verifyPopSignature(params: {
     return subtle.verify(
       { name: "RSA-PSS", saltLength: 32 },
       pubKey,
-      sigBytes as BufferSource,
-      msg as BufferSource,
+      sigBytes as unknown as NodeJS.BufferSource,
+      msg as unknown as NodeJS.BufferSource,
     );
   } catch {
     return false;
@@ -283,8 +284,9 @@ export function generateDecoyLoginResponse(email: string): {
     n: bytesToBase64(nBytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""),
     e: "AQAB", // 65537 — exponente estándar
     alg: "RSA-OAEP-256",
-    kid: `decoy-${normalizedEmail}`,
-  };
+    // kid no es estándar en JsonWebKey pero lo añadimos via cast
+    ...(normalizedEmail ? { kid: `decoy-${normalizedEmail}` } : {}),
+  } as JsonWebKey;
 
   return {
     kdfSalt,
@@ -330,8 +332,8 @@ export async function verifyChallenge(params: {
     return subtle.verify(
       { name: "ECDSA", hash: "SHA-256" },
       publicKey,
-      signature as BufferSource,
-      challenge as BufferSource,
+      signature as unknown as NodeJS.BufferSource,
+      challenge as unknown as NodeJS.BufferSource,
     );
   } catch {
     return false;

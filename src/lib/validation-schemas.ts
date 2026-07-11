@@ -242,7 +242,7 @@ export const registerSchema = z.object({
 // -------- /api/auth/rotate --------
 export const rotateSchema = z.object({
   newKdfAlgorithm: z.enum(["argon2id", "pbkdf2"]),
-  newKdfSalt,
+  newKdfSalt: kdfSalt,
   newKdfIterations: z.number().int().min(1).max(10_000_000),
   newKdfMemoryKiB: z.number().int().min(16_384).max(1_048_576).optional(),
   newKdfParallelism: z.number().int().min(1).max(16).optional(),
@@ -312,7 +312,7 @@ export const recoveryCompleteSchema = z.object({
   email,
   action: z.literal("complete"),
   newKdfAlgorithm: z.enum(["argon2id", "pbkdf2"]),
-  newKdfSalt,
+  newKdfSalt: kdfSalt,
   newKdfIterations: z.number().int().min(1).max(10_000_000),
   newKdfMemoryKiB: z.number().int().min(16_384).max(1_048_576).optional(),
   newKdfParallelism: z.number().int().min(1).max(16).optional(),

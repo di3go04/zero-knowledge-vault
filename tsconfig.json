@@ -37,6 +37,14 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "examples",
+    "skills",
+    "mini-services",
+    "playwright.config.ts",
+    "scripts/e2e-multi-device.spec.ts",
+    "scripts/test-pop.ts",
+    "upload",
+    "download"
   ]
 }

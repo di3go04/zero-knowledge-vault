@@ -885,8 +885,11 @@ export async function performPasswordRotation(params: {
     oldPassword,
     newPassword,
     email,
+    currentKdfAlgorithm,
     currentKdfSaltB64,
     currentKdfIterations,
+    currentKdfMemoryKiB,
+    currentKdfParallelism,
     currentEncryptedPrivateKeyJwkB64,
     currentPrivateKeyIvB64,
   } = params;
@@ -1109,7 +1112,8 @@ export async function wrapPrivateKeyForDevice(
   privateKeyJwkStr: string,
   ecdhSharedKey: CryptoKey,
 ): Promise<{ wrappedKey: string; iv: string }> {
-  return aesEncrypt(ecdhSharedKey, privateKeyJwkStr);
+  const { ciphertext, iv } = await aesEncrypt(ecdhSharedKey, privateKeyJwkStr);
+  return { wrappedKey: ciphertext, iv };
 }
 
 /**
@@ -1425,7 +1429,8 @@ export async function encryptAuditEvent(
     ...event,
     timestamp: new Date().toISOString(),
   });
-  return aesEncrypt(auditKey, eventStr);
+  const { ciphertext, iv } = await aesEncrypt(auditKey, eventStr);
+  return { encryptedEvent: ciphertext, eventIv: iv };
 }
 
 /**
