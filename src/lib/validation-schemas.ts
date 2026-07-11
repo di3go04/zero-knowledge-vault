@@ -184,6 +184,14 @@ export const enrollCompleteSchema = z.object({
   enrollCode,
   wrappedPrivateKeyForDevice: aesGcmBlob(28, 64 * 1024),
   wrappedPrivateKeyIv: aesGcmIv,
+  enrollerPublicKeyECDH: z.object({
+    kty: z.literal("EC"),
+    crv: z.string().min(1),
+    x: z.string().min(1),
+    y: z.string().min(1),
+    ext: z.boolean().optional(),
+    key_ops: z.array(z.string()).optional(),
+  }),
 });
 
 // -------- /api/devices/enroll/poll --------

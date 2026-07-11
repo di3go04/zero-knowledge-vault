@@ -9,11 +9,15 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/lib/session-store";
 import { performRegistration, performLogin, importPublicKeyJwk } from "@/lib/crypto-client";
-import { Loader2, ShieldCheck, KeyRound, LogIn, UserPlus, Eye, EyeOff } from "lucide-react";
+import { NewDeviceEnrollView } from "./NewDeviceEnrollView";
+import { Loader2, ShieldCheck, KeyRound, LogIn, UserPlus, Eye, EyeOff, Smartphone } from "lucide-react";
 
 export function AuthView() {
   const { toast } = useToast();
   const login = useSession((s) => s.login);
+
+  // ----- Modo: "auth" (login/register) o "newdevice" (enroll B) -----
+  const [mode, setMode] = useState<"auth" | "newdevice">("auth");
 
   // ----- Registro -----
   const [regEmail, setRegEmail] = useState("");
@@ -202,8 +206,31 @@ export function AuthView() {
   }
 
   return (
-    <div className="mx-auto max-w-md">
-      <Card className="border-primary/30 bg-card/80">
+    <div className="mx-auto max-w-md space-y-3">
+      {/* Toggle: modo auth normal vs nuevo dispositivo */}
+      <div className="flex gap-2">
+        <Button
+          variant={mode === "auth" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setMode("auth")}
+          className="flex-1"
+        >
+          <LogIn className="mr-1.5 size-3.5" /> Iniciar sesión
+        </Button>
+        <Button
+          variant={mode === "newdevice" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setMode("newdevice")}
+          className="flex-1"
+        >
+          <Smartphone className="mr-1.5 size-3.5" /> Nuevo dispositivo
+        </Button>
+      </div>
+
+      {mode === "newdevice" ? (
+        <NewDeviceEnrollView onDone={() => setMode("auth")} />
+      ) : (
+        <Card className="border-primary/30 bg-card/80">
         <CardHeader className="text-center">
           <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-xl bg-primary/15">
             <ShieldCheck className="size-6 text-primary" />
@@ -360,6 +387,7 @@ export function AuthView() {
           </Tabs>
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }

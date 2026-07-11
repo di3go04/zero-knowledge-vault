@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   if (!validation.success) {
     return NextResponse.json({ error: validation.error }, { status: 400 });
   }
-  const { enrollCode, wrappedPrivateKeyForDevice, wrappedPrivateKeyIv } = validation.data;
+  const { enrollCode, wrappedPrivateKeyForDevice, wrappedPrivateKeyIv, enrollerPublicKeyECDH } = validation.data;
 
   // Buscar Device pendiente por enrollCode
   const device = await db.device.findFirst({
@@ -65,12 +65,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Completar el enrollment: guardar wrappedPrivateKey + limpiar código
+  // Completar el enrollment: guardar wrappedPrivateKey + publicKey efímera de A + limpiar código
   await db.device.update({
     where: { id: device.id },
     data: {
       wrappedPrivateKeyForDevice,
       wrappedPrivateKeyIv,
+      enrollerPublicKeyECDH: JSON.stringify(enrollerPublicKeyECDH),
       enrollCode: null,
       enrollCodeExpiresAt: null,
       lastSeenAt: new Date(),

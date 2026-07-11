@@ -56,9 +56,13 @@ model Device {
   userId                        String
   user                          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   deviceName                    String   // etiqueta legible: "Mac de Ana"
-  // Llave pública ECDH P-256 del dispositivo (JWK, en claro)
+  // Llave pública ECDH P-256 del dispositivo NUEVO (B) — JWK, en claro
   publicKeyECDH                 String   // JSON
   publicKeyECDHFingerprint      String   // hex SHA-256 del JWK canonizado
+  // Llave pública ECDH P-256 EFÍMERA del dispositivo AUTORIZADOR (A) — JWK
+  // Se guarda cuando A completa el enrollment, para que B pueda derivar
+  // el shared secret ECDH y desenvolver la wrappedPrivateKey.
+  enrollerPublicKeyECDH         String?  // JSON, null hasta que A completa
   // PrivateKey RSA del usuario, envuelta con la llave simétrica derivada
   // vía ECDH entre este dispositivo y el dispositivo que lo autorizó.
   wrappedPrivateKeyForDevice    String   // base64, AES-256-GCM

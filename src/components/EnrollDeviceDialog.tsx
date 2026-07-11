@@ -22,6 +22,7 @@ import {
   wrapPrivateKeyForDevice,
   publicKeyFingerprint,
   exportPrivateKeyJwk,
+  exportEcdhPublicKeyJwk,
 } from "@/lib/crypto-client";
 import { clearKeyPairRef, clearCryptoKeyRef, zeroBuffer } from "@/lib/memory-zero";
 import { Loader2, Smartphone, ShieldCheck, Fingerprint, Copy, Check, X } from "lucide-react";
@@ -199,16 +200,23 @@ export function EnrollDeviceDialog({ open, onOpenChange }: EnrollDeviceDialogPro
       // 5b. LIMPIEZA INMEDIATA: el string privateKeyJwkStr contiene la
       // privateKey RSA en claro. JS strings son inmutables, pero podemos
       // sobrescribir la variable local y dejar que el GC la recolecte.
-      // En producción, considerar usar Uint8Array en lugar de string.
       privateKeyJwkStr = "";
 
-      // 6. Enviar al servidor
+      // 5c. Exportar la publicKey ECDH efímera de A para que el Dispositivo B
+      // pueda derivar el mismo shared secret (B.privateKey × A.publicKey).
+      // Sin esto, B no puede desenvolver la wrappedPrivateKey.
+      const enrollerPublicKeyECDH = await exportEcdhPublicKeyJwk(
+        ephemeralPair.publicKey,
+      );
+
+      // 6. Enviar al servidor: wrappedKey + IV + publicKey efímera de A
       const res = await apiFetch("/api/devices/enroll/complete", {
         method: "POST",
         body: JSON.stringify({
           enrollCode,
           wrappedPrivateKeyForDevice: wrappedKey,
           wrappedPrivateKeyIv: iv,
+          enrollerPublicKeyECDH,
         }),
       });
 

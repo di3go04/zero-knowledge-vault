@@ -23,15 +23,7 @@ import {
 } from "@/lib/crypto-server";
 import { issueSessionToken, SESSION_TTL } from "@/lib/session-token";
 import { loginSchema, validatePayload } from "@/lib/validation-schemas";
-import { checkRateLimit, resetRateLimit } from "@/lib/rate-limit";
-
-function getClientIp(req: NextRequest): string {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0].trim();
-  const xri = req.headers.get("x-real-ip");
-  if (xri) return xri;
-  return "unknown";
-}
+import { checkRateLimit, resetRateLimit, getClientIp, RATE_LIMIT_POLICIES } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   let body: any;
@@ -49,11 +41,13 @@ export async function POST(req: NextRequest) {
   const normalizedEmail = email.toLowerCase().trim();
   const ip = getClientIp(req);
 
-  // -------- Rate limit --------
-  // Clave compuesta: IP + email. Así, un atacante desde una IP no puede
-  // atacar a múltiples emails sin que se le agote el cupo por IP.
+  // -------- Rate limit (async — usa Redis o Map) --------
   const rlKey = `login:${ip}:${normalizedEmail}`;
-  const rl = checkRateLimit(rlKey, 5, 15 * 60 * 1000);
+  const rl = await checkRateLimit(
+    rlKey,
+    RATE_LIMIT_POLICIES.login.maxAttempts,
+    RATE_LIMIT_POLICIES.login.windowMs,
+  );
   if (!rl.allowed) {
     return NextResponse.json(
       {
@@ -78,7 +72,7 @@ export async function POST(req: NextRequest) {
 
   // -------- CASO 1: usuario real --------
   if (user && user.keyMaterial) {
-    resetRateLimit(rlKey);
+    await resetRateLimit(rlKey);
 
     const km = user.keyMaterial;
     const fingerprint = km.publicKeyFingerprint;

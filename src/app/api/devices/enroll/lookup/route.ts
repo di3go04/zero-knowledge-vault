@@ -11,6 +11,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAuth } from "@/lib/auth-helper";
+import { checkRateLimit, getClientIp, RATE_LIMIT_POLICIES } from "@/lib/rate-limit";
+import { queryEnrollCodeSchema, validatePayload } from "@/lib/validation-schemas";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuth(req);
@@ -18,7 +20,6 @@ export async function GET(req: NextRequest) {
   const userId = auth.userId;
 
   // Validar query param con Zod
-  const { queryEnrollCodeSchema, validatePayload } = await import("@/lib/validation-schemas");
   const validation = validatePayload(queryEnrollCodeSchema, {
     code: req.nextUrl.searchParams.get("code"),
   });
@@ -26,6 +27,32 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: validation.error }, { status: 400 });
   }
   const { code } = validation.data;
+
+  // -------- Rate limit anti-enumeración de códigos --------
+  // 5 intentos / 1 min / IP. Previene que un atacante pruebe todos los
+  // códigos de 6 dígitos (1M combinaciones) rápidamente.
+  const ip = getClientIp(req);
+  const rlKey = `enroll-lookup:${ip}`;
+  const rl = await checkRateLimit(
+    rlKey,
+    RATE_LIMIT_POLICIES.enrollLookup.maxAttempts,
+    RATE_LIMIT_POLICIES.enrollLookup.windowMs,
+  );
+  if (!rl.allowed) {
+    return NextResponse.json(
+      {
+        error: "Demasiadas búsquedas de código. Espera antes de reintentar.",
+        retryAfter: rl.retryAfterSeconds,
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(rl.retryAfterSeconds),
+          "X-RateLimit-Remaining": "0",
+        },
+      },
+    );
+  }
 
   const device = await db.device.findFirst({
     where: {

@@ -25,30 +25,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { randomBytes } from "node:crypto";
 import { enrollPollSchema, validatePayload } from "@/lib/validation-schemas";
-
-// In-memory challenge store: deviceId → { challenge, expiresAt }
-// Compartido entre /poll y /poll/verify vía globalThis.
-// En producción, mover a Redis con TTL.
-interface PendingChallenge {
-  challenge: string; // base64
-  expiresAt: number; // epoch ms
-}
-
-const globalForChallenges = globalThis as unknown as {
-  __pendingDeviceChallenges?: Map<string, PendingChallenge>;
-};
-
-const pendingChallenges: Map<string, PendingChallenge> =
-  globalForChallenges.__pendingDeviceChallenges ?? new Map();
-globalForChallenges.__pendingDeviceChallenges = pendingChallenges;
-
-// Cleanup expirados cada 60s
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, val] of pendingChallenges) {
-    if (val.expiresAt <= now) pendingChallenges.delete(key);
-  }
-}, 60_000).unref?.();
+import { saveChallenge } from "@/lib/challenge-store";
 
 const CHALLENGE_TTL_MS = 60_000; // 60 segundos
 
@@ -87,11 +64,8 @@ export async function POST(req: NextRequest) {
   const challengeBytes = randomBytes(32);
   const challenge = challengeBytes.toString("base64");
 
-  // Almacenar challenge con TTL
-  pendingChallenges.set(deviceId, {
-    challenge,
-    expiresAt: Date.now() + CHALLENGE_TTL_MS,
-  });
+  // Almacenar challenge en Redis (o Map fallback) con TTL de 60s
+  await saveChallenge(deviceId, challenge, CHALLENGE_TTL_MS);
 
   await db.device.update({
     where: { id: deviceId },

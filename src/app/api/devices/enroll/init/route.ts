@@ -20,8 +20,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { randomBytes } from "node:crypto";
 import { enrollInitSchema, validatePayload } from "@/lib/validation-schemas";
+import { checkRateLimit, getClientIp, RATE_LIMIT_POLICIES } from "@/lib/rate-limit";
 
 const ENROLL_CODE_TTL_MS = 5 * 60 * 1000; // 5 minutos
+const DEVICE_NAME_MAX = 80;
 
 function generateServerEnrollCode(): string {
   const bytes = randomBytes(4);
@@ -37,12 +39,39 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
+  // Validar con Zod primero
   const validation = validatePayload(enrollInitSchema, body);
   if (!validation.success) {
     return NextResponse.json({ error: validation.error }, { status: 400 });
   }
   const { email, deviceName, publicKeyECDH, publicKeyECDHFingerprint } = validation.data;
   const normalizedEmail = email.toLowerCase().trim();
+
+  // -------- Rate limit anti-spam de dispositivos --------
+  // 3 intentos / 5 min / IP+email. Previene que un atacante cree
+  // miles de dispositivos pendientes para saturar la BD.
+  const ip = getClientIp(req);
+  const rlKey = `enroll-init:${ip}:${normalizedEmail}`;
+  const rl = await checkRateLimit(
+    rlKey,
+    RATE_LIMIT_POLICIES.enrollInit.maxAttempts,
+    RATE_LIMIT_POLICIES.enrollInit.windowMs,
+  );
+  if (!rl.allowed) {
+    return NextResponse.json(
+      {
+        error: "Demasiados intentos de enrollment. Espera antes de reintentar.",
+        retryAfter: rl.retryAfterSeconds,
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(rl.retryAfterSeconds),
+          "X-RateLimit-Remaining": "0",
+        },
+      },
+    );
+  }
 
   // Verificar que el usuario existe
   const user = await db.user.findUnique({ where: { email: normalizedEmail } });

@@ -24,22 +24,8 @@ import {
   verifyChallenge,
 } from "@/lib/crypto-server";
 import { enrollVerifySchema, validatePayload } from "@/lib/validation-schemas";
-
-// Re-usar el store del endpoint poll (mismo módulo en runtime)
-// Como Next.js carga cada route en su propio módulo, declaramos un
-// store compartido vía globalThis para single-process.
-interface PendingChallenge {
-  challenge: string;
-  expiresAt: number;
-}
-
-const globalForChallenges = globalThis as unknown as {
-  __pendingDeviceChallenges?: Map<string, PendingChallenge>;
-};
-
-const pendingChallenges: Map<string, PendingChallenge> =
-  globalForChallenges.__pendingDeviceChallenges ?? new Map();
-globalForChallenges.__pendingDeviceChallenges = pendingChallenges;
+import { checkRateLimit, getClientIp, RATE_LIMIT_POLICIES } from "@/lib/rate-limit";
+import { getChallenge, deleteChallenge } from "@/lib/challenge-store";
 
 export async function POST(req: NextRequest) {
   let body: any;
@@ -55,8 +41,34 @@ export async function POST(req: NextRequest) {
   }
   const { deviceId, challenge, signature } = validation.data;
 
-  // 1. Buscar challenge pendiente
-  const pending = pendingChallenges.get(deviceId);
+  // -------- Rate limit anti-bruteforce ECDSA --------
+  // 5 intentos / 1 min / IP+deviceId. Previene que un atacante pruebe
+  // miles de firmas ECDSA por segundo.
+  const ip = getClientIp(req);
+  const rlKey = `enroll-verify:${ip}:${deviceId}`;
+  const rl = await checkRateLimit(
+    rlKey,
+    RATE_LIMIT_POLICIES.enrollVerify.maxAttempts,
+    RATE_LIMIT_POLICIES.enrollVerify.windowMs,
+  );
+  if (!rl.allowed) {
+    return NextResponse.json(
+      {
+        error: "Demasiados intentos de verificación. Espera antes de reintentar.",
+        retryAfter: rl.retryAfterSeconds,
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(rl.retryAfterSeconds),
+          "X-RateLimit-Remaining": "0",
+        },
+      },
+    );
+  }
+
+  // 1. Buscar challenge pendiente en el store (Redis o Map)
+  const pending = await getChallenge(deviceId);
   if (!pending) {
     // No revelar si el challenge existía o no
     return NextResponse.json(
@@ -65,16 +77,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 2. Verificar expiración
-  if (pending.expiresAt <= Date.now()) {
-    pendingChallenges.delete(deviceId);
-    return NextResponse.json(
-      { error: "Challenge expirado. Solicita uno nuevo en /api/devices/enroll/poll" },
-      { status: 403 },
-    );
-  }
-
-  // 3. Verificar que el challenge enviado coincide con el almacenado
+  // 2. Verificar que el challenge enviado coincide con el almacenado
   // (evita que el atacante use un challenge distinto)
   if (pending.challenge !== challenge) {
     return NextResponse.json(
@@ -83,37 +86,37 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 4. Buscar dispositivo
+  // 3. Buscar dispositivo
   const device = await db.device.findUnique({ where: { id: deviceId } });
   if (!device) {
-    pendingChallenges.delete(deviceId);
+    await deleteChallenge(deviceId);
     return NextResponse.json({ error: "Dispositivo no encontrado" }, { status: 404 });
   }
 
   if (device.revokedAt) {
-    pendingChallenges.delete(deviceId);
+    await deleteChallenge(deviceId);
     return NextResponse.json({ error: "Dispositivo revocado" }, { status: 403 });
   }
 
   if (!device.wrappedPrivateKeyForDevice || device.wrappedPrivateKeyIv === "") {
-    pendingChallenges.delete(deviceId);
+    await deleteChallenge(deviceId);
     return NextResponse.json({ error: "Enrollment no completado" }, { status: 400 });
   }
 
-  // 5. Verificar fingerprint de la publicKey ECDH (defense in depth)
+  // 4. Verificar fingerprint de la publicKey ECDH (defense in depth)
   const storedPublicKeyJwk = JSON.parse(device.publicKeyECDH) as JsonWebKey;
   const serverFingerprint = await publicKeyFingerprint(
     storedPublicKeyJwk as Record<string, unknown>,
   );
   if (serverFingerprint !== device.publicKeyECDHFingerprint) {
-    pendingChallenges.delete(deviceId);
+    await deleteChallenge(deviceId);
     return NextResponse.json(
       { error: "Fingerprint de publicKey ECDH inconsistente — posible manipulación de BD" },
       { status: 500 },
     );
   }
 
-  // 6. Verificar firma ECDSA del challenge
+  // 5. Verificar firma ECDSA del challenge
   const signatureValid = await verifyChallenge({
     publicKeyJwk: storedPublicKeyJwk,
     challengeB64: challenge,
@@ -122,21 +125,30 @@ export async function POST(req: NextRequest) {
 
   if (!signatureValid) {
     // NO eliminar el challenge en caso de fallo — permite reintentos
-    // pero con rate-limiting implícito (60s TTL). En producción, añadir
-    // contador de intentos fallidos por deviceId.
+    // pero con rate-limiting (5/min) que previene bruteforce.
     return NextResponse.json(
       { error: "Firma del challenge inválida. Verifica que estás usando la privateKey ECDH correcta." },
       { status: 403 },
     );
   }
 
-  // 7. Firma válida — eliminar challenge (one-time use) y devolver wrappedKey
-  pendingChallenges.delete(deviceId);
+  // 6. Firma válida — eliminar challenge (one-time use) y devolver wrappedKey
+  await deleteChallenge(deviceId);
 
   await db.device.update({
     where: { id: deviceId },
     data: { lastSeenAt: new Date() },
   });
+
+  // 7. Verificar que enrollerPublicKeyECDH esté guardado (A completó el enrollment)
+  if (!device.enrollerPublicKeyECDH) {
+    return NextResponse.json(
+      { error: "El dispositivo autorizador aún no ha completado el enrollment" },
+      { status: 400 },
+    );
+  }
+
+  const enrollerPublicKeyECDH = JSON.parse(device.enrollerPublicKeyECDH) as JsonWebKey;
 
   return NextResponse.json({
     enrolled: true,
@@ -145,6 +157,7 @@ export async function POST(req: NextRequest) {
     wrappedPrivateKeyForDevice: device.wrappedPrivateKeyForDevice,
     wrappedPrivateKeyIv: device.wrappedPrivateKeyIv,
     publicKeyECDH: storedPublicKeyJwk,
-    note: "Challenge verificado. Desenvuelve la privateKey RSA con tu ECDH privateKey usando ECDH(shared, peerPublic).",
+    enrollerPublicKeyECDH,
+    note: "Challenge verificado. Desenvuelve la privateKey RSA derivando ECDH(B.privateKey, enrollerPublicKeyECDH).",
   });
 }
