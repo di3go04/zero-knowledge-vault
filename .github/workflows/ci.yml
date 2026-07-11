@@ -26,6 +26,9 @@ jobs:
     name: Lint & Type Check
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      DATABASE_URL: "file:./db/test.db"
+      SESSION_SECRET: "ci-test-secret-min-32-characters-long!!"
 
     steps:
       - name: Checkout
@@ -49,6 +52,8 @@ jobs:
 
       - name: Prisma schema validation
         run: bunx prisma validate
+        env:
+          DATABASE_URL: "file:./db/test.db"
 
   # ===================================================================
   # Job 2: Tests E2E (Playwright)
