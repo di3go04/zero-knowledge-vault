@@ -14,24 +14,34 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Z.ai Code Scaffold - AI-Powered Development",
-  description: "Modern Next.js scaffold optimized for AI-powered development with Z.ai. Built with TypeScript, Tailwind CSS, and shadcn/ui.",
-  keywords: ["Z.ai", "Next.js", "TypeScript", "Tailwind CSS", "shadcn/ui", "AI development", "React"],
-  authors: [{ name: "Z.ai Team" }],
+  title: "Zero-Knowledge Vault — Gestor de Contraseñas para Equipos",
+  description:
+    "Gestor de contraseñas Zero-Knowledge con cifrado end-to-end en el navegador. AES-256-GCM, Argon2id, RSA-OAEP, ECDH. El servidor nunca ve tus secretos.",
+  keywords: [
+    "zero-knowledge",
+    "password manager",
+    "encryption",
+    "AES-256-GCM",
+    "Argon2id",
+    "Web Crypto API",
+    "ECDH",
+    "security",
+  ],
+  authors: [{ name: "ZK Vault Team" }],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/logo.svg",
   },
   openGraph: {
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
-    url: "https://chat.z.ai",
-    siteName: "Z.ai",
+    title: "Zero-Knowledge Vault",
+    description:
+      "Gestor de contraseñas Zero-Knowledge con cifrado end-to-end en el navegador.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
+    title: "Zero-Knowledge Vault",
+    description:
+      "Gestor de contraseñas Zero-Knowledge con cifrado end-to-end en el navegador.",
   },
 };
 
@@ -41,7 +51,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="es" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >

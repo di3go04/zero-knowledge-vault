@@ -5,7 +5,7 @@ import { ArchitectureView } from "@/components/ArchitectureView";
 import { AuthView } from "@/components/AuthView";
 import { VaultView } from "@/components/VaultView";
 import { useSession, isAuthenticated } from "@/lib/session-store";
-import { ShieldCheck, Lock, BookOpen, Database } from "lucide-react";
+import { Lock, BookOpen, Database, ShieldCheck } from "lucide-react";
 
 export default function Home() {
   const session = useSession();
@@ -18,7 +18,7 @@ export default function Home() {
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2.5">
             <div className="flex size-9 items-center justify-center rounded-lg bg-primary/15">
-              <ShieldCheck className="size-5 text-primary" />
+              <Lock className="size-5 text-primary" />
             </div>
             <div>
               <h1 className="text-sm font-semibold leading-tight sm:text-base">
