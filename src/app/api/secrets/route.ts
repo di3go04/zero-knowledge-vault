@@ -8,15 +8,8 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import {
-  IV_EXPECTED_BYTES,
-  MAX_BLOB_BYTES,
-  validateBase64Blob,
-} from "@/lib/crypto-server";
 import { requireAuth } from "@/lib/auth-helper";
-
-// Un wrappedKey RSA-OAEP-2048 son exactamente 256 bytes
-const WRAPPED_KEY_BYTES = 256;
+import { createSecretSchema, validatePayload } from "@/lib/validation-schemas";
 
 // ----------------------- GET (list) -----------------------
 export async function GET(req: NextRequest) {
@@ -67,38 +60,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const { encryptedTitle, titleIv, encryptedData, dataIv, wrappedKeyForOwner } = body ?? {};
-
-  if (!validateBase64Blob(titleIv, IV_EXPECTED_BYTES, IV_EXPECTED_BYTES)) {
-    return NextResponse.json(
-      { error: `titleIv debe ser base64 de exactamente ${IV_EXPECTED_BYTES} bytes` },
-      { status: 400 },
-    );
+  const validation = validatePayload(createSecretSchema, body);
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
-  if (!validateBase64Blob(dataIv, IV_EXPECTED_BYTES, IV_EXPECTED_BYTES)) {
-    return NextResponse.json(
-      { error: `dataIv debe ser base64 de exactamente ${IV_EXPECTED_BYTES} bytes` },
-      { status: 400 },
-    );
-  }
-  if (!validateBase64Blob(encryptedTitle, 1, MAX_BLOB_BYTES)) {
-    return NextResponse.json(
-      { error: `encryptedTitle debe ser base64 (blob cifrado) ≤ ${MAX_BLOB_BYTES} bytes` },
-      { status: 400 },
-    );
-  }
-  if (!validateBase64Blob(encryptedData, 1, MAX_BLOB_BYTES)) {
-    return NextResponse.json(
-      { error: `encryptedData debe ser base64 (blob cifrado) ≤ ${MAX_BLOB_BYTES} bytes` },
-      { status: 400 },
-    );
-  }
-  if (!validateBase64Blob(wrappedKeyForOwner, WRAPPED_KEY_BYTES, WRAPPED_KEY_BYTES)) {
-    return NextResponse.json(
-      { error: `wrappedKeyForOwner debe ser base64 de exactamente ${WRAPPED_KEY_BYTES} bytes (RSA-OAEP-2048)` },
-      { status: 400 },
-    );
-  }
+  const { encryptedTitle, titleIv, encryptedData, dataIv, wrappedKeyForOwner } = validation.data;
 
   const user = await db.user.findUnique({ where: { id: userId } });
   if (!user) {

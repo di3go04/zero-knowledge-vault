@@ -32,11 +32,17 @@ import {
   Trash2,
   UserX,
   KeyRound as RotateIcon,
+  Smartphone,
+  KeyRound as RecoveryIcon,
+  ScrollText,
 } from "lucide-react";
 import { CreateSecretDialog } from "./CreateSecretDialog";
 import { ViewSecretDialog, type SecretListItem } from "./ViewSecretDialog";
 import { ShareSecretDialog } from "./ShareSecretDialog";
 import { RotatePasswordDialog } from "./RotatePasswordDialog";
+import { EnrollDeviceDialog } from "./EnrollDeviceDialog";
+import { RecoverySetupDialog } from "./RecoverySetupDialog";
+import { AuditLogViewer } from "./AuditLogViewer";
 
 export function VaultView() {
   const { toast } = useToast();
@@ -54,6 +60,9 @@ export function VaultView() {
   const [revokeTarget, setRevokeTarget] = useState<SecretListItem | null>(null);
   const [busyAction, setBusyAction] = useState(false);
   const [rotateOpen, setRotateOpen] = useState(false);
+  const [enrollDeviceOpen, setEnrollDeviceOpen] = useState(false);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [auditLogOpen, setAuditLogOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -166,7 +175,7 @@ export function VaultView() {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button variant="outline" size="sm" onClick={load} disabled={loading}>
               <RefreshCw className={`mr-2 size-3.5 ${loading ? "animate-spin" : ""}`} />
               Refrescar
@@ -177,10 +186,34 @@ export function VaultView() {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => setEnrollDeviceOpen(true)}
+              title="Autorizar nuevo dispositivo"
+            >
+              <Smartphone className="mr-2 size-3.5" /> Dispositivo
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setRotateOpen(true)}
               title="Rotar contraseña maestra"
             >
               <RotateIcon className="mr-2 size-3.5" /> Rotar clave
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRecoveryOpen(true)}
+              title="Configurar backup de recuperación"
+            >
+              <RecoveryIcon className="mr-2 size-3.5" /> Recovery
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAuditLogOpen(true)}
+              title="Ver audit log"
+            >
+              <ScrollText className="mr-2 size-3.5" /> Audit
             </Button>
             <Button variant="ghost" size="sm" onClick={() => serverLogout()}>
               <LogOut className="mr-2 size-3.5" /> Salir
@@ -234,8 +267,6 @@ export function VaultView() {
         open={rotateOpen}
         onOpenChange={setRotateOpen}
         onRotated={() => {
-          // Tras rotar, la masterKey en memoria sigue siendo la vieja.
-          // Forzamos logout para que el usuario re-login con la nueva.
           logout();
           toast({
             title: "Sesión cerrada",
@@ -243,6 +274,9 @@ export function VaultView() {
           });
         }}
       />
+      <EnrollDeviceDialog open={enrollDeviceOpen} onOpenChange={setEnrollDeviceOpen} />
+      <RecoverySetupDialog open={recoveryOpen} onOpenChange={setRecoveryOpen} />
+      <AuditLogViewer open={auditLogOpen} onOpenChange={setAuditLogOpen} />
 
       {/* Confirmar borrado de secreto propio */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>

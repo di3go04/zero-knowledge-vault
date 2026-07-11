@@ -157,12 +157,22 @@ let _argonWorkerRequestId = 0;
 
 function getArgonWorker(): Worker {
   if (_argonWorker) return _argonWorker;
-  // Lazy load del worker solo cuando se necesita Argon2id.
-  // Usamos dynamic import para evitar que Turbopack intente empaquetar
-  // el worker si no se usa.
-  throw new Error(
-    "Argon2id worker no disponible en este build. Usa PBKDF2 (USE_ARGON2=false).",
-  );
+  // Crear el Web Worker para Argon2id.
+  // Next.js/Turbopack empaqueta el worker automáticamente con esta sintaxis.
+  // Si el worker falla al cargar, la función argon2HashInWorker captura
+  // el error y derivará a PBKDF2 como fallback.
+  try {
+    _argonWorker = new Worker(new URL("./argon2-worker.ts", import.meta.url));
+    // Manejar errores no capturados del worker
+    _argonWorker.onerror = (e) => {
+      console.error("[argon2-worker] Error no capturado:", e.message);
+      _argonWorker = null; // Reset para permitir reintento
+    };
+    return _argonWorker;
+  } catch (err) {
+    console.warn("[argon2] No se pudo crear Worker, fallback a PBKDF2:", err);
+    throw new Error("Argon2id worker no disponible");
+  }
 }
 
 function argon2HashInWorker(params: {
@@ -208,44 +218,67 @@ export async function deriveMasterKey(
 ): Promise<CryptoKey> {
   const normalized = normalizePassword(password);
 
-  let rawKey: ArrayBuffer;
-
   if (params.algorithm === "argon2id") {
-    // Argon2id vía Web Worker (no bloquea UI)
-    rawKey = await argon2HashInWorker({
-      password: normalized,
-      salt: params.salt,
-      memoryKiB: params.memoryKiB ?? ARGON2_MEMORY_KIB,
-      iterations: params.argon2Iterations ?? ARGON2_ITERATIONS,
-      parallelism: params.parallelism ?? ARGON2_PARALLELISM,
-    });
-  } else {
-    // PBKDF2 legacy — compatible con cuentas existentes
-    const passwordKey = await crypto.subtle.importKey(
-      "raw",
-      new TextEncoder().encode(normalized),
-      { name: "PBKDF2" },
-      false,
-      ["deriveKey"],
-    );
-    return crypto.subtle.deriveKey(
-      {
-        name: "PBKDF2",
-        salt: params.salt as BufferSource,
-        iterations: params.iterations ?? KDF_ITERATIONS,
-        hash: "SHA-256",
-      },
-      passwordKey,
-      { name: "AES-GCM", length: AES_KEY_LENGTH },
-      false,
-      ["encrypt", "decrypt"],
-    );
+    // Intentar Argon2id vía Web Worker con fallback automático a PBKDF2
+    try {
+      const rawKey = await argon2HashInWorker({
+        password: normalized,
+        salt: params.salt,
+        memoryKiB: params.memoryKiB ?? ARGON2_MEMORY_KIB,
+        iterations: params.argon2Iterations ?? ARGON2_ITERATIONS,
+        parallelism: params.parallelism ?? ARGON2_PARALLELISM,
+      });
+      return crypto.subtle.importKey(
+        "raw",
+        rawKey,
+        { name: "AES-GCM", length: AES_KEY_LENGTH },
+        false,
+        ["encrypt", "decrypt"],
+      );
+    } catch (err) {
+      console.warn(
+        "[kdf] Argon2id falló, fallback a PBKDF2. Esto reduce la seguridad anti-GPU. Error:",
+        err,
+      );
+      // Fallback a PBKDF2 con iteraciones altas
+      const passwordKey = await crypto.subtle.importKey(
+        "raw",
+        new TextEncoder().encode(normalized),
+        { name: "PBKDF2" },
+        false,
+        ["deriveKey"],
+      );
+      return crypto.subtle.deriveKey(
+        {
+          name: "PBKDF2",
+          salt: params.salt as BufferSource,
+          iterations: KDF_ITERATIONS, // PBKDF2 high iterations
+          hash: "SHA-256",
+        },
+        passwordKey,
+        { name: "AES-GCM", length: AES_KEY_LENGTH },
+        false,
+        ["encrypt", "decrypt"],
+      );
+    }
   }
 
-  // Importar el raw key de Argon2id como CryptoKey AES-256-GCM no extraíble
-  return crypto.subtle.importKey(
+  // PBKDF2 (legacy o explícito)
+  const passwordKey = await crypto.subtle.importKey(
     "raw",
-    rawKey,
+    new TextEncoder().encode(normalized),
+    { name: "PBKDF2" },
+    false,
+    ["deriveKey"],
+  );
+  return crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: params.salt as BufferSource,
+      iterations: params.iterations ?? KDF_ITERATIONS,
+      hash: "SHA-256",
+    },
+    passwordKey,
     { name: "AES-GCM", length: AES_KEY_LENGTH },
     false,
     ["encrypt", "decrypt"],
@@ -586,12 +619,12 @@ export async function performRegistration(
   // 1. Salt aleatorio
   const salt = randomBytes(SALT_LENGTH);
 
-  // 2. Derivar llave maestra.
-  //    Usamos PBKDF2 en lugar de Argon2id porque el Web Worker con
-  //    hash-wasm causa inestabilidad en el sandbox de desarrollo.
-  //    El código Argon2id está completo y puede activarse configurando
-  //    USE_ARGON2=true cuando el entorno lo soporte.
-  const USE_ARGON2 = false; // TODO: activar en producción con build estable
+  // 2. Derivar llave maestra con Argon2id (memory-hard, GPU-resistant).
+  //    Se ejecuta en Web Worker para no bloquear la UI. Si el worker
+  //    falla (ej. navegador sin soporte WASM), deriveMasterKey hace
+  //    fallback automático a PBKDF2 con iteraciones altas.
+  //    El flag USE_ARGON2 permite desactivarlo para entornos sin Worker.
+  const USE_ARGON2 = true;
   const kdfParams = USE_ARGON2
     ? argon2DefaultParams(salt)
     : pbkdf2LegacyParams(salt, KDF_ITERATIONS);
@@ -860,9 +893,9 @@ export async function performPasswordRotation(params: {
   );
   const privateKeyJwk = JSON.parse(privateKeyJwkStr) as JsonWebKey;
 
-  // 2. Generar nuevo salt y derivar nueva masterKey.
-  //    Mismo algoritmo que el registro (PBKDF2 en dev, Argon2id en prod).
-  const USE_ARGON2 = false;
+  // 2. Generar nuevo salt y derivar nueva masterKey con Argon2id.
+  //    Mismo algoritmo que el registro.
+  const USE_ARGON2 = true;
   const newSalt = randomBytes(SALT_LENGTH);
   const newKdfParams = USE_ARGON2
     ? argon2DefaultParams(newSalt)
@@ -1040,6 +1073,97 @@ export async function unwrapPrivateKeyForDevice(
   const privateKeyJwkStr = await aesDecrypt(ecdhSharedKey, wrappedKeyB64, ivB64);
   const jwk = JSON.parse(privateKeyJwkStr) as JsonWebKey;
   return importPrivateKeyJwk(jwk);
+}
+
+// =========================================================================
+// 13b. CHALLENGE-RESPONSE ECDSA (P-256) para Enroll Device
+// =========================================================================
+//
+// Cierra la brecha crítica del flujo Enroll Device:
+//   1. El servidor genera un challenge (nonce 32 bytes) y lo asocia al
+//      deviceId con TTL corto (60s).
+//   2. El Dispositivo B firma el challenge con su privateKey ECDH usando
+//      ECDSA P-256 (SHA-256).
+//   3. El servidor verifica la firma con la publicKeyECDH registrada.
+//      Solo si es válida, devuelve la wrappedPrivateKeyForDevice.
+//
+// Esto prueba posesión de la privateKey ECDH, no solo conocimiento del
+// deviceId. Un atacante que intercepte el deviceId no puede responder
+// al challenge sin la privateKey.
+//
+// Nota: ECDSA P-256 reutiliza el mismo par de llaves que ECDH P-256
+// matemáticamente (mismo grupo curva), pero Web Crypto requiere importar
+// la llave con uso `sign`/`verify` por separado.
+// =========================================================================
+
+const ECDSA_CURVE = "P-256";
+
+/**
+ * Importa una JWK de privateKey ECDH como ECDSA para firmar challenges.
+ * Mismo par de llaves, distinto uso.
+ */
+export async function importEcdhPrivateKeyForSigning(jwk: JsonWebKey): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    "jwk",
+    sanitizeJwk(jwk),
+    { name: "ECDSA", namedCurve: ECDSA_CURVE },
+    false,
+    ["sign"],
+  );
+}
+
+/**
+ * Importa una JWK de publicKey ECDH como ECDSA para verificar challenges.
+ */
+export async function importEcdhPublicKeyForVerifying(jwk: JsonWebKey): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    "jwk",
+    sanitizeJwk(jwk),
+    { name: "ECDSA", namedCurve: ECDSA_CURVE },
+    true,
+    ["verify"],
+  );
+}
+
+/**
+ * Firma un challenge (nonce) con ECDSA P-256 + SHA-256.
+ * Devuelve la firma en base64.
+ *
+ * Usado por el Dispositivo B para probar posesión de su privateKey ECDH.
+ */
+export async function signChallenge(
+  privateKey: CryptoKey,
+  challengeB64: string,
+): Promise<string> {
+  const signature = await crypto.subtle.sign(
+    { name: "ECDSA", hash: "SHA-256" },
+    privateKey,
+    base64ToBuf(challengeB64) as BufferSource,
+  );
+  return bufToBase64(signature);
+}
+
+/**
+ * Verifica una firma ECDSA P-256 sobre un challenge.
+ * Usado por el servidor en /api/devices/enroll/poll/verify.
+ */
+export async function verifyChallenge(params: {
+  publicKeyJwk: JsonWebKey;
+  challengeB64: string;
+  signatureB64: string;
+}): Promise<boolean> {
+  const { publicKeyJwk, challengeB64, signatureB64 } = params;
+  try {
+    const publicKey = await importEcdhPublicKeyForVerifying(publicKeyJwk);
+    return crypto.subtle.verify(
+      { name: "ECDSA", hash: "SHA-256" },
+      publicKey,
+      base64ToBuf(signatureB64) as BufferSource,
+      base64ToBuf(challengeB64) as BufferSource,
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**

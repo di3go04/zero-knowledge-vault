@@ -18,12 +18,8 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import {
-  IV_EXPECTED_BYTES,
-  MAX_BLOB_BYTES,
-  validateBase64Blob,
-} from "@/lib/crypto-server";
 import { requireAuth } from "@/lib/auth-helper";
+import { createAuditLogSchema, validatePayload } from "@/lib/validation-schemas";
 
 const VALID_CATEGORIES = ["auth", "secret", "share", "device", "recovery"];
 const MAX_LOGS_PER_REQUEST = 200;
@@ -75,26 +71,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const { encryptedEvent, eventIv, eventCategory } = body ?? {};
-
-  if (!validateBase64Blob(encryptedEvent, 1, MAX_BLOB_BYTES)) {
-    return NextResponse.json(
-      { error: `encryptedEvent debe ser base64 ≤ ${MAX_BLOB_BYTES} bytes` },
-      { status: 400 },
-    );
+  const validation = validatePayload(createAuditLogSchema, body);
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
-  if (!validateBase64Blob(eventIv, IV_EXPECTED_BYTES, IV_EXPECTED_BYTES)) {
-    return NextResponse.json(
-      { error: `eventIv debe ser base64 de ${IV_EXPECTED_BYTES} bytes` },
-      { status: 400 },
-    );
-  }
-  if (typeof eventCategory !== "string" || !VALID_CATEGORIES.includes(eventCategory)) {
-    return NextResponse.json(
-      { error: `eventCategory debe ser uno de: ${VALID_CATEGORIES.join(", ")}` },
-      { status: 400 },
-    );
-  }
+  const { encryptedEvent, eventIv, eventCategory } = validation.data;
 
   const log = await db.auditLog.create({
     data: {

@@ -15,10 +15,8 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { validateBase64Blob } from "@/lib/crypto-server";
 import { requireAuth } from "@/lib/auth-helper";
-
-const WRAPPED_KEY_BYTES = 256;
+import { createShareSchema, revokeShareSchema, validatePayload } from "@/lib/validation-schemas";
 
 export async function POST(req: NextRequest) {
   const auth = await requireAuth(req);
@@ -32,24 +30,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const { secretId, recipientId, wrappedSymmetricKey } = body ?? {};
-
-  if (typeof secretId !== "string" || !secretId) {
-    return NextResponse.json({ error: "secretId requerido" }, { status: 400 });
+  const validation = validatePayload(createShareSchema, body);
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
-  if (typeof recipientId !== "string" || !recipientId) {
-    return NextResponse.json({ error: "recipientId requerido" }, { status: 400 });
-  }
-  if (
-    !validateBase64Blob(wrappedSymmetricKey, WRAPPED_KEY_BYTES, WRAPPED_KEY_BYTES)
-  ) {
-    return NextResponse.json(
-      {
-        error: `wrappedSymmetricKey debe ser base64 de exactamente ${WRAPPED_KEY_BYTES} bytes (RSA-OAEP-2048 wrapped AES key)`,
-      },
-      { status: 400 },
-    );
-  }
+  const { secretId, recipientId, wrappedSymmetricKey } = validation.data;
 
   const secret = await db.secret.findUnique({ where: { id: secretId } });
   if (!secret) {
@@ -126,13 +111,11 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const { secretId, recipientId } = body ?? {};
-  if (typeof secretId !== "string" || !secretId) {
-    return NextResponse.json({ error: "secretId requerido" }, { status: 400 });
+  const validation = validatePayload(revokeShareSchema, body);
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
-  if (typeof recipientId !== "string" || !recipientId) {
-    return NextResponse.json({ error: "recipientId requerido" }, { status: 400 });
-  }
+  const { secretId, recipientId } = validation.data;
 
   const secret = await db.secret.findUnique({ where: { id: secretId } });
   if (!secret) {

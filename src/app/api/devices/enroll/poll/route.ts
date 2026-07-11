@@ -1,24 +1,56 @@
 /**
  * POST /api/devices/enroll/poll
  *
- * Dispositivo NUEVO (B) hace poll para saber si su enrollment fue
- * completado por el dispositivo A. Si fue completado, devuelve la
- * wrappedPrivateKey para que B la desenvuelva con su ECDH privateKey.
+ * MEJORA Fase 3 — Challenge-Response ECDH:
  *
- * Body:
- *   { deviceId, publicKeyECDH (JWK) — para re-verificar identidad }
+ * El Dispositivo B llama a este endpoint para:
+ *   - Saber si el enrollment fue completado (status check)
+ *   - Obtener un challenge criptográfico (nonce 32 bytes) que debe firmar
+ *     con su privateKey ECDH para recibir la wrappedPrivateKeyForDevice
  *
- * El servidor NO requiere autenticación (el dispositivo B aún no tiene
- * sesión). En su lugar, valida que el deviceId existe y que el
- * enrollment fue completado (wrappedPrivateKeyForDevice no vacío).
+ * El challenge se almacena en memoria (Map server-side) con TTL de 60s
+ * asociado al deviceId. Un challenge solo se puede usar una vez.
  *
- * Adicionalmente, el dispositivo B debe enviar prueba de posesión de
- * su ECDH privateKey firmando un challenge. Por simplicidad en esta
- * demo, confiamos en que el deviceId + ECDH publicKey coinciden.
- * En producción se debe implementar un challenge-response ECDH.
+ * Flujo completo:
+ *   1. B llama a poll → recibe { enrolled: true, challenge }
+ *   2. B firma challenge con su privateKey ECDH (ECDSA P-256)
+ *   3. B llama a poll/verify con { deviceId, challenge, signature }
+ *   4. Servidor verifica firma contra publicKeyECDH registrada
+ *   5. Si válida → devuelve wrappedPrivateKeyForDevice
+ *
+ * Esto cierra la brecha de suplantación: un atacante con el deviceId
+ * no puede responder al challenge sin la privateKey ECDH.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { randomBytes } from "node:crypto";
+import { enrollPollSchema, validatePayload } from "@/lib/validation-schemas";
+
+// In-memory challenge store: deviceId → { challenge, expiresAt }
+// Compartido entre /poll y /poll/verify vía globalThis.
+// En producción, mover a Redis con TTL.
+interface PendingChallenge {
+  challenge: string; // base64
+  expiresAt: number; // epoch ms
+}
+
+const globalForChallenges = globalThis as unknown as {
+  __pendingDeviceChallenges?: Map<string, PendingChallenge>;
+};
+
+const pendingChallenges: Map<string, PendingChallenge> =
+  globalForChallenges.__pendingDeviceChallenges ?? new Map();
+globalForChallenges.__pendingDeviceChallenges = pendingChallenges;
+
+// Cleanup expirados cada 60s
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of pendingChallenges) {
+    if (val.expiresAt <= now) pendingChallenges.delete(key);
+  }
+}, 60_000).unref?.();
+
+const CHALLENGE_TTL_MS = 60_000; // 60 segundos
 
 export async function POST(req: NextRequest) {
   let body: any;
@@ -28,14 +60,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const { deviceId } = body ?? {};
-  if (typeof deviceId !== "string" || !deviceId) {
-    return NextResponse.json({ error: "deviceId requerido" }, { status: 400 });
+  const validation = validatePayload(enrollPollSchema, body);
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
+  const { deviceId } = validation.data;
 
   const device = await db.device.findUnique({ where: { id: deviceId } });
   if (!device) {
     return NextResponse.json({ error: "Dispositivo no encontrado" }, { status: 404 });
+  }
+
+  if (device.revokedAt) {
+    return NextResponse.json({ error: "Dispositivo revocado" }, { status: 403 });
   }
 
   // Verificar que el enrollment fue completado
@@ -46,25 +83,28 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Verificar que no esté revocado
-  if (device.revokedAt) {
-    return NextResponse.json({ error: "Dispositivo revocado" }, { status: 403 });
-  }
+  // Generar challenge criptográfico (32 bytes aleatorios)
+  const challengeBytes = randomBytes(32);
+  const challenge = challengeBytes.toString("base64");
 
-  // Actualizar lastSeenAt
+  // Almacenar challenge con TTL
+  pendingChallenges.set(deviceId, {
+    challenge,
+    expiresAt: Date.now() + CHALLENGE_TTL_MS,
+  });
+
   await db.device.update({
     where: { id: deviceId },
     data: { lastSeenAt: new Date() },
   });
 
-  // Devolver la wrappedPrivateKey para que el dispositivo B la desenvuelva
   return NextResponse.json({
     enrolled: true,
     deviceId: device.id,
     deviceName: device.deviceName,
-    wrappedPrivateKeyForDevice: device.wrappedPrivateKeyForDevice,
-    wrappedPrivateKeyIv: device.wrappedPrivateKeyIv,
-    publicKeyECDH: JSON.parse(device.publicKeyECDH),
-    note: "Desenvuelve la privateKey RSA con tu ECDH privateKey usando ECDH(shared, peerPublic).",
+    challenge,
+    challengeExpiresIn: CHALLENGE_TTL_MS / 1000,
+    publicKeyECDHFingerprint: device.publicKeyECDHFingerprint,
+    nextStep: "Firma el challenge con tu privateKey ECDH (ECDSA P-256) y llama a POST /api/devices/enroll/poll/verify con { deviceId, challenge, signature }.",
   });
 }

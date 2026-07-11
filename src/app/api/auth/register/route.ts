@@ -18,21 +18,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import {
-  KDF_ITERATIONS_MAX,
-  KDF_ITERATIONS_MIN,
-  IV_EXPECTED_BYTES,
-  MAX_BLOB_BYTES,
-  MAX_JWK_BYTES,
-  SALT_MAX_BYTES,
-  SALT_MIN_BYTES,
   publicKeyFingerprint,
-  validateBase64Blob,
-  validateKdfIterations,
   verifyPopSignature,
 } from "@/lib/crypto-server";
+import { registerSchema, validatePayload } from "@/lib/validation-schemas";
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const EMAIL_MAX_LEN = 320; // RFC 5321
 const NAME_MAX_LEN = 100;
 
 export async function POST(req: NextRequest) {
@@ -43,6 +33,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
+  // Validación con Zod — rechaza cualquier campo que no sea un blob
+  // cifrado válido o un parámetro en rango.
+  const validation = validatePayload(registerSchema, body);
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
+  }
   const {
     email,
     name,
@@ -55,146 +51,12 @@ export async function POST(req: NextRequest) {
     encryptedPrivateKeyJwk,
     privateKeyIv,
     popSignature,
-  } = body ?? {};
+  } = validation.data;
 
-  // -------- kdfAlgorithm --------
-  if (kdfAlgorithm !== "argon2id" && kdfAlgorithm !== "pbkdf2") {
-    return NextResponse.json(
-      { error: "kdfAlgorithm debe ser 'argon2id' o 'pbkdf2'" },
-      { status: 400 },
-    );
-  }
-
-  // -------- email --------
-  if (
-    typeof email !== "string" ||
-    email.length > EMAIL_MAX_LEN ||
-    !EMAIL_RE.test(email)
-  ) {
-    return NextResponse.json({ error: "email inválido" }, { status: 400 });
-  }
   const normalizedEmail = email.toLowerCase().trim();
-
-  // -------- name --------
-  if (
-    name !== undefined &&
-    name !== null &&
-    (typeof name !== "string" || name.length > NAME_MAX_LEN)
-  ) {
-    return NextResponse.json({ error: "name inválido" }, { status: 400 });
-  }
-
-  // -------- kdfIterations --------
-  //   Argon2id: 1-10 (t = time parameter)
-  //   PBKDF2: 310.000 - 1.000.000
-  if (typeof kdfIterations !== "number" || !Number.isInteger(kdfIterations)) {
-    return NextResponse.json({ error: "kdfIterations debe ser entero" }, { status: 400 });
-  }
-  if (kdfAlgorithm === "argon2id") {
-    if (kdfIterations < 1 || kdfIterations > 10) {
-      return NextResponse.json(
-        { error: "Argon2id: kdfIterations (t) debe estar entre 1 y 10" },
-        { status: 400 },
-      );
-    }
-    // Validar memoria (16 MiB - 1 GiB)
-    if (
-      typeof kdfMemoryKiB !== "number" ||
-      kdfMemoryKiB < 16_384 ||
-      kdfMemoryKiB > 1_048_576
-    ) {
-      return NextResponse.json(
-        { error: "Argon2id: kdfMemoryKiB debe estar entre 16384 (16 MiB) y 1048576 (1 GiB)" },
-        { status: 400 },
-      );
-    }
-    if (
-      typeof kdfParallelism !== "number" ||
-      kdfParallelism < 1 ||
-      kdfParallelism > 16
-    ) {
-      return NextResponse.json(
-        { error: "Argon2id: kdfParallelism debe estar entre 1 y 16" },
-        { status: 400 },
-      );
-    }
-  } else {
-    // PBKDF2 legacy
-    if (kdfIterations < KDF_ITERATIONS_MIN || kdfIterations > KDF_ITERATIONS_MAX) {
-      return NextResponse.json(
-        {
-          error: `PBKDF2: kdfIterations debe estar entre ${KDF_ITERATIONS_MIN} y ${KDF_ITERATIONS_MAX}`,
-        },
-        { status: 400 },
-      );
-    }
-  }
-
-  // -------- kdfSalt: base64 + longitud decodificada --------
-  if (!validateBase64Blob(kdfSalt, SALT_MIN_BYTES, SALT_MAX_BYTES)) {
-    return NextResponse.json(
-      {
-        error: `kdfSalt debe ser base64 y decodificar entre ${SALT_MIN_BYTES} y ${SALT_MAX_BYTES} bytes`,
-      },
-      { status: 400 },
-    );
-  }
-
-  // -------- privateKeyIv: exactamente 12 bytes --------
-  if (!validateBase64Blob(privateKeyIv, IV_EXPECTED_BYTES, IV_EXPECTED_BYTES)) {
-    return NextResponse.json(
-      { error: `privateKeyIv debe ser base64 de exactamente ${IV_EXPECTED_BYTES} bytes` },
-      { status: 400 },
-    );
-  }
-
-  // -------- encryptedPrivateKeyJwk: ≤ 64 KiB --------
-  if (!validateBase64Blob(encryptedPrivateKeyJwk, 1, MAX_BLOB_BYTES)) {
-    return NextResponse.json(
-      { error: `encryptedPrivateKeyJwk debe ser base64 ≤ ${MAX_BLOB_BYTES} bytes` },
-      { status: 400 },
-    );
-  }
-
-  // -------- publicKeyJwk: estructura + tamaño --------
-  if (
-    !publicKeyJwk ||
-    typeof publicKeyJwk !== "object" ||
-    Array.isArray(publicKeyJwk)
-  ) {
-    return NextResponse.json(
-      { error: "publicKeyJwk debe ser un objeto JsonWebKey" },
-      { status: 400 },
-    );
-  }
   const jwkStr = JSON.stringify(publicKeyJwk);
-  if (jwkStr.length > MAX_JWK_BYTES) {
-    return NextResponse.json(
-      { error: `publicKeyJwk excede ${MAX_JWK_BYTES} bytes` },
-      { status: 400 },
-    );
-  }
-  if (
-    publicKeyJwk.kty !== "RSA" ||
-    typeof publicKeyJwk.n !== "string" ||
-    typeof publicKeyJwk.e !== "string"
-  ) {
-    return NextResponse.json(
-      { error: "publicKeyJwk debe ser RSA con kty, n y e" },
-      { status: 400 },
-    );
-  }
-
-  // -------- popSignature: base64 ≤ 512 bytes --------
-  if (!validateBase64Blob(popSignature, 1, 512)) {
-    return NextResponse.json(
-      { error: "popSignature debe ser base64 (firma RSA-PSS)" },
-      { status: 400 },
-    );
-  }
 
   // -------- Verificar PoP ANTES de tocar la BD --------
-  // Calcular fingerprint server-side (no confiamos en la del cliente)
   const serverFingerprint = await publicKeyFingerprint(publicKeyJwk as Record<string, unknown>);
 
   const popValid = await verifyPopSignature({

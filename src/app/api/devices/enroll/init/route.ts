@@ -18,12 +18,10 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { validateBase64Blob } from "@/lib/crypto-server";
 import { randomBytes } from "node:crypto";
+import { enrollInitSchema, validatePayload } from "@/lib/validation-schemas";
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ENROLL_CODE_TTL_MS = 5 * 60 * 1000; // 5 minutos
-const DEVICE_NAME_MAX = 80;
 
 function generateServerEnrollCode(): string {
   const bytes = randomBytes(4);
@@ -39,41 +37,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const { email, deviceName, publicKeyECDH, publicKeyECDHFingerprint } = body ?? {};
-
-  if (typeof email !== "string" || !EMAIL_RE.test(email)) {
-    return NextResponse.json({ error: "email inválido" }, { status: 400 });
+  const validation = validatePayload(enrollInitSchema, body);
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
+  const { email, deviceName, publicKeyECDH, publicKeyECDHFingerprint } = validation.data;
   const normalizedEmail = email.toLowerCase().trim();
-
-  if (
-    typeof deviceName !== "string" ||
-    deviceName.length === 0 ||
-    deviceName.length > DEVICE_NAME_MAX
-  ) {
-    return NextResponse.json({ error: "deviceName inválido" }, { status: 400 });
-  }
-
-  if (
-    !publicKeyECDH ||
-    typeof publicKeyECDH !== "object" ||
-    publicKeyECDH.kty !== "EC" ||
-    typeof publicKeyECDH.crv !== "string" ||
-    typeof publicKeyECDH.x !== "string" ||
-    typeof publicKeyECDH.y !== "string"
-  ) {
-    return NextResponse.json(
-      { error: "publicKeyECDH debe ser JWK EC P-256" },
-      { status: 400 },
-    );
-  }
-
-  if (typeof publicKeyECDHFingerprint !== "string" || !/^[0-9a-f]{64}$/.test(publicKeyECDHFingerprint)) {
-    return NextResponse.json(
-      { error: "publicKeyECDHFingerprint debe ser hex SHA-256 (64 chars)" },
-      { status: 400 },
-    );
-  }
 
   // Verificar que el usuario existe
   const user = await db.user.findUnique({ where: { email: normalizedEmail } });

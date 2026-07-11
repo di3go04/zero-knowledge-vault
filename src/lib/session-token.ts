@@ -44,67 +44,118 @@ interface BlacklistAdapter {
 
 let _adapter: BlacklistAdapter | null = null;
 
+/**
+ * Adaptador de blacklist con resiliencia:
+ *
+ * - Si REDIS_URL está definida Y Redis responde → usa Redis.
+ * - Si REDIS_URL está definida PERO Redis cae → fallback a Map in-memory
+ *   + log de warning. La API sigue funcionando (degraded mode).
+ * - Si REDIS_URL no está definida → usa Map in-memory (dev).
+ *
+ * El adaptador Redis envuelve cada operación en try/catch para que
+ * un error de conexión Redis nunca tire la API. Si Redis falla
+ * durante una operación `has`, se devuelve false (fail-open) para no
+ * bloquear al usuario legítimo, pero se loguea el error.
+ *
+ * En producción, considerar fail-closed si la seguridad es prioritaria
+ * sobre disponibilidad (devolver true en `has` si Redis cae → bloquear).
+ */
 async function getBlacklistAdapter(): Promise<BlacklistAdapter> {
   if (_adapter) return _adapter;
 
-  // En producción: usar Redis (ioredis) si REDIS_URL está definida.
-  // En desarrollo: usar Map in-memory (suficiente para single-process).
-  //
-  // NOTA: ioredis se carga dinámicamente solo si REDIS_URL está presente
-  // para evitar overhead en dev. Si no está, usamos Map in-memory.
   const redisUrl = process.env.REDIS_URL;
   if (redisUrl) {
     try {
-      // Dynamic import — solo se carga si Redis está configurado
       const ioredisModule: any = await import("ioredis").catch(() => null);
       if (ioredisModule) {
         const Redis = ioredisModule.default;
         const redis = new Redis(redisUrl, {
           maxRetriesPerRequest: 1,
           connectTimeout: 2000,
+          enableOfflineQueue: false, // Fallar inmediatamente si Redis cae
+          retryStrategy: (times) => {
+            if (times > 3) return null; // Dejar de reintentar tras 3 fallos
+            return Math.min(times * 200, 1000);
+          },
         });
+
+        // Test de conexión
         await redis.ping();
+
+        // Manejar errores de conexión persistentes
+        redis.on("error", (err: Error) => {
+          console.warn("[blacklist] Redis error (sigue en degraded mode):", err.message);
+        });
+
         _adapter = {
           async add(jti: string, ttlSeconds: number) {
-            await redis.set(`bl:${jti}`, "1", "EX", ttlSeconds);
+            try {
+              await redis.set(`bl:${jti}`, "1", "EX", ttlSeconds);
+            } catch (err: any) {
+              // Redis caído — fallback a Map in-memory
+              console.warn("[blacklist] Redis add falló, usando Map:", err.message);
+              memoryAdd(jti, ttlSeconds);
+            }
           },
           async has(jti: string) {
-            const v = await redis.get(`bl:${jti}`);
-            return v !== null;
+            try {
+              const v = await redis.get(`bl:${jti}`);
+              if (v !== null) return true;
+              // También verificar Map in-memory por si hubo fallback
+              return memoryHas(jti);
+            } catch (err: any) {
+              // Redis caído — fail-open (no bloquear usuario legítimo)
+              // pero verificar Map in-memory por si el jti fue añadido
+              // durante un fallo de Redis.
+              console.warn("[blacklist] Redis has falló, usando Map:", err.message);
+              return memoryHas(jti);
+            }
           },
         };
         console.log("[blacklist] Redis conectado");
         return _adapter;
       }
-    } catch (err) {
-      console.warn("[blacklist] Redis no disponible, fallback a Map:", err);
+    } catch (err: any) {
+      console.warn("[blacklist] Redis no disponible, fallback a Map:", err?.message ?? err);
     }
   }
 
-  // Fallback: Map in-memory (no persiste entre reinicios, solo para dev)
-  const memoryBlacklist = new Map<string, number>(); // jti -> exp timestamp
+  // Map in-memory (dev o degraded mode)
   _adapter = {
     async add(jti: string, ttlSeconds: number) {
-      const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
-      memoryBlacklist.set(jti, exp);
-      setTimeout(() => {
-        if (memoryBlacklist.get(jti) === exp) {
-          memoryBlacklist.delete(jti);
-        }
-      }, ttlSeconds * 1000).unref?.();
+      memoryAdd(jti, ttlSeconds);
     },
     async has(jti: string) {
-      const exp = memoryBlacklist.get(jti);
-      if (!exp) return false;
-      if (exp <= Math.floor(Date.now() / 1000)) {
-        memoryBlacklist.delete(jti);
-        return false;
-      }
-      return true;
+      return memoryHas(jti);
     },
   };
-  console.log("[blacklist] Usando Map in-memory (dev fallback)");
+  console.log("[blacklist] Usando Map in-memory");
   return _adapter;
+}
+
+// ---------------------------------------------------------------------------
+// Map in-memory compartido entre adaptadores (para fallback transparente)
+// ---------------------------------------------------------------------------
+const memoryBlacklist = new Map<string, number>(); // jti -> exp timestamp
+
+function memoryAdd(jti: string, ttlSeconds: number) {
+  const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
+  memoryBlacklist.set(jti, exp);
+  setTimeout(() => {
+    if (memoryBlacklist.get(jti) === exp) {
+      memoryBlacklist.delete(jti);
+    }
+  }, ttlSeconds * 1000).unref?.();
+}
+
+function memoryHas(jti: string): boolean {
+  const exp = memoryBlacklist.get(jti);
+  if (!exp) return false;
+  if (exp <= Math.floor(Date.now() / 1000)) {
+    memoryBlacklist.delete(jti);
+    return false;
+  }
+  return true;
 }
 
 // ---------------------------------------------------------------------------

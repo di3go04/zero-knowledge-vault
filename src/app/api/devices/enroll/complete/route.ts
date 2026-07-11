@@ -19,8 +19,8 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { validateBase64Blob, IV_EXPECTED_BYTES, MAX_BLOB_BYTES } from "@/lib/crypto-server";
 import { requireAuth } from "@/lib/auth-helper";
+import { enrollCompleteSchema, validatePayload } from "@/lib/validation-schemas";
 
 export async function POST(req: NextRequest) {
   const auth = await requireAuth(req);
@@ -34,23 +34,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const { enrollCode, wrappedPrivateKeyForDevice, wrappedPrivateKeyIv } = body ?? {};
-
-  if (typeof enrollCode !== "string" || !/^\d{6}$/.test(enrollCode)) {
-    return NextResponse.json({ error: "enrollCode debe ser 6 dígitos" }, { status: 400 });
+  const validation = validatePayload(enrollCompleteSchema, body);
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
-  if (!validateBase64Blob(wrappedPrivateKeyForDevice, 1, MAX_BLOB_BYTES)) {
-    return NextResponse.json(
-      { error: `wrappedPrivateKeyForDevice debe ser base64 ≤ ${MAX_BLOB_BYTES} bytes` },
-      { status: 400 },
-    );
-  }
-  if (!validateBase64Blob(wrappedPrivateKeyIv, IV_EXPECTED_BYTES, IV_EXPECTED_BYTES)) {
-    return NextResponse.json(
-      { error: `wrappedPrivateKeyIv debe ser base64 de ${IV_EXPECTED_BYTES} bytes` },
-      { status: 400 },
-    );
-  }
+  const { enrollCode, wrappedPrivateKeyForDevice, wrappedPrivateKeyIv } = validation.data;
 
   // Buscar Device pendiente por enrollCode
   const device = await db.device.findFirst({

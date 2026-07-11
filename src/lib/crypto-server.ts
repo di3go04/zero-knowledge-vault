@@ -295,3 +295,45 @@ export function generateDecoyLoginResponse(email: string): {
     isDecoy: true,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Challenge-Response ECDSA P-256 (server-side mirror del cliente)
+// Usado en /api/devices/enroll/poll/verify
+// ---------------------------------------------------------------------------
+
+/**
+ * Verifica una firma ECDSA P-256 sobre un challenge usando la publicKey
+ * ECDH del dispositivo. Reutiliza el mismo par de llaves que ECDH P-256
+ * pero con uso `verify`.
+ */
+export async function verifyChallenge(params: {
+  publicKeyJwk: JsonWebKey;
+  challengeB64: string;
+  signatureB64: string;
+}): Promise<boolean> {
+  const { publicKeyJwk, challengeB64, signatureB64 } = params;
+  try {
+    // Sanitizar JWK (eliminar key_ops, ext, alg)
+    const { key_ops: _kops, ext: _ext, alg: _alg, ...clean } = publicKeyJwk;
+
+    const publicKey = await subtle.importKey(
+      "jwk",
+      clean,
+      { name: "ECDSA", namedCurve: "P-256" },
+      true,
+      ["verify"],
+    );
+
+    const signature = base64ToBytes(signatureB64);
+    const challenge = base64ToBytes(challengeB64);
+
+    return subtle.verify(
+      { name: "ECDSA", hash: "SHA-256" },
+      publicKey,
+      signature as BufferSource,
+      challenge as BufferSource,
+    );
+  } catch {
+    return false;
+  }
+}
