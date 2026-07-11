@@ -25,6 +25,7 @@ import {
   bufToBase64,
   RECOVERY_ITERATIONS,
 } from "@/lib/crypto-client";
+import { clearCryptoKeyRef, zeroBuffer } from "@/lib/memory-zero";
 import { useSession } from "@/lib/session-store";
 import {
   Loader2,
@@ -67,7 +68,7 @@ export function RecoverySetupDialog({ open, onOpenChange }: RecoverySetupDialogP
   // Refs para limpieza de memoria
   const recoveryKeyRef = useRef<CryptoKey | null>(null);
 
-  // Cleanup al cerrar
+  // Cleanup al cerrar — zeroing de mnemonic y recovery key
   useEffect(() => {
     if (!open) {
       setStep("intro");
@@ -75,10 +76,18 @@ export function RecoverySetupDialog({ open, onOpenChange }: RecoverySetupDialogP
       setConfirmText("");
       setShowMnemonic(true);
       setCopied(false);
-      // Limpiar refs criptográficas
-      recoveryKeyRef.current = null;
+      // LIMPIEZA DE MEMORIA: desreferenciar recovery key
+      clearCryptoKeyRef(recoveryKeyRef);
     }
   }, [open]);
+
+  // Limpieza al desmontar
+  useEffect(() => {
+    return () => {
+      setMnemonic("");
+      clearCryptoKeyRef(recoveryKeyRef);
+    };
+  }, []);
 
   async function generateMnemonic() {
     setBusy(true);

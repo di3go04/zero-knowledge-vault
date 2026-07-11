@@ -21,6 +21,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAuth } from "@/lib/auth-helper";
+import { pathIdSchema, validatePayload } from "@/lib/validation-schemas";
 
 export async function DELETE(
   req: NextRequest,
@@ -30,10 +31,12 @@ export async function DELETE(
   if (!auth.ok) return auth.response;
   const userId = auth.userId;
 
-  const { id: secretId } = await params;
-  if (!secretId) {
-    return NextResponse.json({ error: "secretId requerido" }, { status: 400 });
+  const { id } = await params;
+  const idValidation = validatePayload(pathIdSchema, id);
+  if (!idValidation.success) {
+    return NextResponse.json({ error: idValidation.error }, { status: 400 });
   }
+  const secretId = idValidation.data;
 
   const secret = await db.secret.findUnique({ where: { id: secretId } });
   if (!secret) {

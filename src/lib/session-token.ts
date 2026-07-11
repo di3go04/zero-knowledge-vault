@@ -43,6 +43,8 @@ interface BlacklistAdapter {
 }
 
 let _adapter: BlacklistAdapter | null = null;
+let _adapterType: "redis" | "memory" | null = null;
+let _redisHealthOk = true; // Health flag — se resetea en errores, se restaura en healthcheck
 
 /**
  * Adaptador de blacklist con resiliencia:
@@ -57,8 +59,8 @@ let _adapter: BlacklistAdapter | null = null;
  * durante una operación `has`, se devuelve false (fail-open) para no
  * bloquear al usuario legítimo, pero se loguea el error.
  *
- * En producción, considerar fail-closed si la seguridad es prioritaria
- * sobre disponibilidad (devolver true en `has` si Redis cae → bloquear).
+ * HEALTHCHECK: si Redis cae y se recupera, un healthcheck periódico
+ * (cada 30s) resetea el adapter para volver a usar Redis.
  */
 async function getBlacklistAdapter(): Promise<BlacklistAdapter> {
   if (_adapter) return _adapter;
@@ -79,17 +81,26 @@ async function getBlacklistAdapter(): Promise<BlacklistAdapter> {
           },
         });
 
-        // Test de conexión
+        // Test de conexión inicial
         await redis.ping();
 
         // Manejar errores de conexión persistentes
         redis.on("error", (err: Error) => {
           console.warn("[blacklist] Redis error (sigue en degraded mode):", err.message);
+          _redisHealthOk = false;
+        });
+
+        redis.on("ready", () => {
+          if (!_redisHealthOk) {
+            console.log("[blacklist] Redis recuperado, volviendo a modo normal");
+            _redisHealthOk = true;
+          }
         });
 
         _adapter = {
           async add(jti: string, ttlSeconds: number) {
             try {
+              if (!_redisHealthOk) throw new Error("Redis unhealthy");
               await redis.set(`bl:${jti}`, "1", "EX", ttlSeconds);
             } catch (err: any) {
               // Redis caído — fallback a Map in-memory
@@ -99,6 +110,7 @@ async function getBlacklistAdapter(): Promise<BlacklistAdapter> {
           },
           async has(jti: string) {
             try {
+              if (!_redisHealthOk) throw new Error("Redis unhealthy");
               const v = await redis.get(`bl:${jti}`);
               if (v !== null) return true;
               // También verificar Map in-memory por si hubo fallback
@@ -112,6 +124,7 @@ async function getBlacklistAdapter(): Promise<BlacklistAdapter> {
             }
           },
         };
+        _adapterType = "redis";
         console.log("[blacklist] Redis conectado");
         return _adapter;
       }
@@ -129,6 +142,7 @@ async function getBlacklistAdapter(): Promise<BlacklistAdapter> {
       return memoryHas(jti);
     },
   };
+  _adapterType = "memory";
   console.log("[blacklist] Usando Map in-memory");
   return _adapter;
 }

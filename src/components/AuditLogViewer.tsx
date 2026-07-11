@@ -21,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useApi } from "@/lib/api-client";
 import { useSession } from "@/lib/session-store";
 import { deriveAuditKey, decryptAuditEvent, type AuditCategory } from "@/lib/crypto-client";
+import { clearCryptoKeyRef } from "@/lib/memory-zero";
 import {
   Loader2,
   ScrollText,
@@ -138,15 +139,23 @@ export function AuditLogViewer({ open, onOpenChange }: AuditLogViewerProps) {
     }
   }, [open, loadAndDecrypt]);
 
-  // Cleanup al cerrar
+  // Cleanup al cerrar — zeroing de audit key y logs descifrados
   useEffect(() => {
     if (!open) {
       setLogs([]);
       setCategoryFilter("all");
-      // Limpiar audit key de memoria
-      auditKeyRef.current = null;
+      // LIMPIEZA DE MEMORIA: desreferenciar audit key
+      clearCryptoKeyRef(auditKeyRef);
     }
   }, [open]);
+
+  // Limpieza al desmontar
+  useEffect(() => {
+    return () => {
+      setLogs([]);
+      clearCryptoKeyRef(auditKeyRef);
+    };
+  }, []);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

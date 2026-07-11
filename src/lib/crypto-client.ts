@@ -219,48 +219,33 @@ export async function deriveMasterKey(
   const normalized = normalizePassword(password);
 
   if (params.algorithm === "argon2id") {
-    // Intentar Argon2id vía Web Worker con fallback automático a PBKDF2
-    try {
-      const rawKey = await argon2HashInWorker({
-        password: normalized,
-        salt: params.salt,
-        memoryKiB: params.memoryKiB ?? ARGON2_MEMORY_KIB,
-        iterations: params.argon2Iterations ?? ARGON2_ITERATIONS,
-        parallelism: params.parallelism ?? ARGON2_PARALLELISM,
-      });
-      return crypto.subtle.importKey(
-        "raw",
-        rawKey,
-        { name: "AES-GCM", length: AES_KEY_LENGTH },
-        false,
-        ["encrypt", "decrypt"],
-      );
-    } catch (err) {
-      console.warn(
-        "[kdf] Argon2id falló, fallback a PBKDF2. Esto reduce la seguridad anti-GPU. Error:",
-        err,
-      );
-      // Fallback a PBKDF2 con iteraciones altas
-      const passwordKey = await crypto.subtle.importKey(
-        "raw",
-        new TextEncoder().encode(normalized),
-        { name: "PBKDF2" },
-        false,
-        ["deriveKey"],
-      );
-      return crypto.subtle.deriveKey(
-        {
-          name: "PBKDF2",
-          salt: params.salt as BufferSource,
-          iterations: KDF_ITERATIONS, // PBKDF2 high iterations
-          hash: "SHA-256",
-        },
-        passwordKey,
-        { name: "AES-GCM", length: AES_KEY_LENGTH },
-        false,
-        ["encrypt", "decrypt"],
-      );
-    }
+    // Argon2id vía Web Worker.
+    //
+    // IMPORTANTE: NO hacemos fallback silencioso a PBKDF2 aquí. Si el
+    // worker falla, propagamos el error. El llamador decide qué hacer:
+    //   - En REGISTRO: si Argon2id falla, abortar (no registrar con
+    //     algoritmo equivocado).
+    //   - En LOGIN: el servidor ya dijo qué algoritmo se usó al registrar;
+    //     si era argon2id, DEBE usarse argon2id (no se puede cambiar a
+    //     pbkdf2 porque la masterKey sería distinta y el descifrado fallaría).
+    //
+    // El fallback a PBKDF2 solo tiene sentido si el usuario tiene una
+    // cuenta legacy (kdfAlgorithm="pbkdf2" en BD), en cuyo caso
+    // params.algorithm === "pbkdf2" y este bloque no se ejecuta.
+    const rawKey = await argon2HashInWorker({
+      password: normalized,
+      salt: params.salt,
+      memoryKiB: params.memoryKiB ?? ARGON2_MEMORY_KIB,
+      iterations: params.argon2Iterations ?? ARGON2_ITERATIONS,
+      parallelism: params.parallelism ?? ARGON2_PARALLELISM,
+    });
+    return crypto.subtle.importKey(
+      "raw",
+      rawKey,
+      { name: "AES-GCM", length: AES_KEY_LENGTH },
+      false,
+      ["encrypt", "decrypt"],
+    );
   }
 
   // PBKDF2 (legacy o explícito)
@@ -620,16 +605,54 @@ export async function performRegistration(
   const salt = randomBytes(SALT_LENGTH);
 
   // 2. Derivar llave maestra con Argon2id (memory-hard, GPU-resistant).
-  //    Se ejecuta en Web Worker para no bloquear la UI. Si el worker
-  //    falla (ej. navegador sin soporte WASM), deriveMasterKey hace
-  //    fallback automático a PBKDF2 con iteraciones altas.
-  //    El flag USE_ARGON2 permite desactivarlo para entornos sin Worker.
-  const USE_ARGON2 = true;
-  const kdfParams = USE_ARGON2
-    ? argon2DefaultParams(salt)
-    : pbkdf2LegacyParams(salt, KDF_ITERATIONS);
-  const masterKey = await deriveMasterKey(password, kdfParams);
-  const kdfAlgorithm: KdfAlgorithm = USE_ARGON2 ? "argon2id" : "pbkdf2";
+  //    Se ejecuta en Web Worker para no bloquear la UI.
+  //
+  //    ESTRATEGIA DE FALLBACK CONSISTENTE:
+  //    - Intentar Argon2id primero.
+  //    - Si el worker falla (WASM no soportado, error de carga), hacer
+  //      fallback a PBKDF2 con iteraciones altas PERO marcar
+  //      kdfAlgorithm="pbkdf2" honestamente (no mentir al servidor).
+  //    - Así el login futuro será consistente: el servidor dirá "pbkdf2"
+  //      y el cliente usará PBKDF2.
+  const PREFER_ARGON2 = true;
+  let masterKey: CryptoKey;
+  let kdfAlgorithm: KdfAlgorithm;
+  let kdfIterationsUsed: number;
+  let kdfMemoryKiBUsed: number | undefined;
+  let kdfParallelismUsed: number | undefined;
+
+  if (PREFER_ARGON2) {
+    try {
+      masterKey = await deriveMasterKey(password, argon2DefaultParams(salt));
+      kdfAlgorithm = "argon2id";
+      kdfIterationsUsed = ARGON2_ITERATIONS;
+      kdfMemoryKiBUsed = ARGON2_MEMORY_KIB;
+      kdfParallelismUsed = ARGON2_PARALLELISM;
+    } catch (err) {
+      console.warn(
+        "[kdf] Argon2id no disponible, fallback HONESTO a PBKDF2. " +
+          "La cuenta se registrará con kdfAlgorithm='pbkdf2'. Error:",
+        err,
+      );
+      masterKey = await deriveMasterKey(
+        password,
+        pbkdf2LegacyParams(salt, KDF_ITERATIONS),
+      );
+      kdfAlgorithm = "pbkdf2";
+      kdfIterationsUsed = KDF_ITERATIONS;
+      kdfMemoryKiBUsed = undefined;
+      kdfParallelismUsed = undefined;
+    }
+  } else {
+    masterKey = await deriveMasterKey(
+      password,
+      pbkdf2LegacyParams(salt, KDF_ITERATIONS),
+    );
+    kdfAlgorithm = "pbkdf2";
+    kdfIterationsUsed = KDF_ITERATIONS;
+    kdfMemoryKiBUsed = undefined;
+    kdfParallelismUsed = undefined;
+  }
 
   // 3. Generar par RSA-OAEP + RSA-PSS
   const rsaPair = await generateRsaKeyPair();
@@ -656,9 +679,9 @@ export async function performRegistration(
   return {
     kdfAlgorithm,
     kdfSalt: kdfSaltB64,
-    kdfIterations: USE_ARGON2 ? ARGON2_ITERATIONS : KDF_ITERATIONS,
-    kdfMemoryKiB: USE_ARGON2 ? ARGON2_MEMORY_KIB : undefined,
-    kdfParallelism: USE_ARGON2 ? ARGON2_PARALLELISM : undefined,
+    kdfIterations: kdfIterationsUsed,
+    kdfMemoryKiB: kdfMemoryKiBUsed,
+    kdfParallelism: kdfParallelismUsed,
     publicKeyJwk,
     publicKeyFingerprint: fingerprint,
     encryptedPrivateKey,
@@ -893,15 +916,44 @@ export async function performPasswordRotation(params: {
   );
   const privateKeyJwk = JSON.parse(privateKeyJwkStr) as JsonWebKey;
 
-  // 2. Generar nuevo salt y derivar nueva masterKey con Argon2id.
-  //    Mismo algoritmo que el registro.
-  const USE_ARGON2 = true;
+  // 2. Generar nuevo salt y derivar nueva masterKey.
+  //    Misma estrategia de fallback consistente que el registro.
+  const PREFER_ARGON2 = true;
   const newSalt = randomBytes(SALT_LENGTH);
-  const newKdfParams = USE_ARGON2
-    ? argon2DefaultParams(newSalt)
-    : pbkdf2LegacyParams(newSalt, KDF_ITERATIONS);
-  const newMasterKey = await deriveMasterKey(newPassword, newKdfParams);
-  const newKdfAlgorithm: KdfAlgorithm = USE_ARGON2 ? "argon2id" : "pbkdf2";
+  let newMasterKey: CryptoKey;
+  let newKdfAlgorithm: KdfAlgorithm;
+  let newKdfIterations: number;
+  let newKdfMemoryKiB: number | undefined;
+  let newKdfParallelism: number | undefined;
+
+  if (PREFER_ARGON2) {
+    try {
+      newMasterKey = await deriveMasterKey(newPassword, argon2DefaultParams(newSalt));
+      newKdfAlgorithm = "argon2id";
+      newKdfIterations = ARGON2_ITERATIONS;
+      newKdfMemoryKiB = ARGON2_MEMORY_KIB;
+      newKdfParallelism = ARGON2_PARALLELISM;
+    } catch (err) {
+      console.warn("[kdf] Argon2id no disponible en rotación, fallback HONESTO a PBKDF2:", err);
+      newMasterKey = await deriveMasterKey(
+        newPassword,
+        pbkdf2LegacyParams(newSalt, KDF_ITERATIONS),
+      );
+      newKdfAlgorithm = "pbkdf2";
+      newKdfIterations = KDF_ITERATIONS;
+      newKdfMemoryKiB = undefined;
+      newKdfParallelism = undefined;
+    }
+  } else {
+    newMasterKey = await deriveMasterKey(
+      newPassword,
+      pbkdf2LegacyParams(newSalt, KDF_ITERATIONS),
+    );
+    newKdfAlgorithm = "pbkdf2";
+    newKdfIterations = KDF_ITERATIONS;
+    newKdfMemoryKiB = undefined;
+    newKdfParallelism = undefined;
+  }
 
   // 3. Re-cifrar la MISMA privateKey JWK con la nueva masterKey
   const { ciphertext: newEncryptedJwk, iv: newIv } = await aesEncrypt(
@@ -944,9 +996,9 @@ export async function performPasswordRotation(params: {
   return {
     newKdfAlgorithm,
     newKdfSalt: newKdfSaltB64,
-    newKdfIterations: USE_ARGON2 ? ARGON2_ITERATIONS : KDF_ITERATIONS,
-    newKdfMemoryKiB: USE_ARGON2 ? ARGON2_MEMORY_KIB : undefined,
-    newKdfParallelism: USE_ARGON2 ? ARGON2_PARALLELISM : undefined,
+    newKdfIterations: newKdfIterations,
+    newKdfMemoryKiB: newKdfMemoryKiB,
+    newKdfParallelism: newKdfParallelism,
     newEncryptedPrivateKey,
     newPopSignature,
     newMasterKey,

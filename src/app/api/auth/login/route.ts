@@ -22,9 +22,8 @@ import {
   publicKeyFingerprint,
 } from "@/lib/crypto-server";
 import { issueSessionToken, SESSION_TTL } from "@/lib/session-token";
+import { loginSchema, validatePayload } from "@/lib/validation-schemas";
 import { checkRateLimit, resetRateLimit } from "@/lib/rate-limit";
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function getClientIp(req: NextRequest): string {
   const xff = req.headers.get("x-forwarded-for");
@@ -42,10 +41,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const email = body?.email;
-  if (typeof email !== "string" || !EMAIL_RE.test(email)) {
-    return NextResponse.json({ error: "email inválido" }, { status: 400 });
+  const validation = validatePayload(loginSchema, body);
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
+  const email = validation.data.email;
   const normalizedEmail = email.toLowerCase().trim();
   const ip = getClientIp(req);
 

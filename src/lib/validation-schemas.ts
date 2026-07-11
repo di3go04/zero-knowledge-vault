@@ -283,3 +283,73 @@ export function validatePayload<T>(
     .join("; ");
   return { success: false, error: errorMsg };
 }
+
+// ---------------------------------------------------------------------------
+// Schemas para endpoints que faltaban (login, recovery/recover, query params)
+// ---------------------------------------------------------------------------
+
+// -------- /api/auth/login --------
+export const loginSchema = z.object({
+  email,
+});
+
+// -------- /api/auth/recovery/recover --------
+// Dos modos: "get-blob" (obtiene blob de recuperación) y "complete" (restablece)
+export const recoveryGetBlobSchema = z.object({
+  email,
+  action: z.literal("get-blob"),
+});
+
+export const recoveryCompleteSchema = z.object({
+  email,
+  action: z.literal("complete"),
+  newKdfAlgorithm: z.enum(["argon2id", "pbkdf2"]),
+  newKdfSalt,
+  newKdfIterations: z.number().int().min(1).max(10_000_000),
+  newKdfMemoryKiB: z.number().int().min(16_384).max(1_048_576).optional(),
+  newKdfParallelism: z.number().int().min(1).max(16).optional(),
+  newEncryptedPrivateKeyJwk: aesGcmBlob(28, 64 * 1024),
+  newPrivateKeyIv: aesGcmIv,
+  newPopSignature: base64String,
+});
+
+// -------- Query param validators (GET endpoints) --------
+
+/** Valida un query param `code` de 6 dígitos. */
+export const queryEnrollCodeSchema = z.object({
+  code: z
+    .string()
+    .min(1, "code requerido")
+    .max(6)
+    .regex(/^\d{6}$/, "code debe ser 6 dígitos"),
+});
+
+/** Valida un query param `email`. */
+export const queryEmailSchema = z.object({
+  email,
+});
+
+/** Valida un query param `category` para audit logs. */
+export const queryCategorySchema = z.object({
+  category: z
+    .string()
+    .optional()
+    .refine(
+      (v) => !v || ["auth", "secret", "share", "device", "recovery"].includes(v),
+      "category debe ser uno de: auth, secret, share, device, recovery",
+    ),
+  limit: z
+    .string()
+    .optional()
+    .refine(
+      (v) => !v || (/^\d+$/.test(v) && parseInt(v, 10) > 0 && parseInt(v, 10) <= 200),
+      "limit debe ser entero 1-200",
+    ),
+});
+
+/** Valida un path param `id` (cuid). */
+export const pathIdSchema = z
+  .string()
+  .min(1, "id requerido")
+  .max(100, "id demasiado largo")
+  .regex(/^[a-zA-Z0-9_-]+$/, "id debe ser alfanumérico");

@@ -20,15 +20,16 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { queryEmailSchema, validatePayload } from "@/lib/validation-schemas";
 
 export async function GET(req: NextRequest) {
-  const email = req.nextUrl.searchParams.get("email");
-  if (!email || !EMAIL_RE.test(email)) {
-    return NextResponse.json({ error: "Parámetro 'email' inválido" }, { status: 400 });
+  const validation = validatePayload(queryEmailSchema, {
+    email: req.nextUrl.searchParams.get("email"),
+  });
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
-  const normalizedEmail = email.toLowerCase().trim();
+  const normalizedEmail = validation.data.email.toLowerCase().trim();
 
   const user = await db.user.findUnique({
     where: { email: normalizedEmail },

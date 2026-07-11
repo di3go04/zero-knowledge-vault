@@ -10,9 +10,11 @@
  * Recibe: { password, salt, memoryKiB, iterations, parallelism }
  * Devuelve: { rawKey: ArrayBuffer (32 bytes) }
  *
- * MEJORA Fase 3: manejo robusto de errores y reinicialización del
- * módulo WASM. Si el módulo falla al cargar, el worker se auto-reinicia
- * en la siguiente petición.
+ * MEJORA Módulo 2 (Memory Zeroing + robustez):
+ *   - Cache del módulo WASM con reset automático en fallo.
+ *   - Copia defensiva del salt (puede llegar detached).
+ *   - Limpieza de referencias tras el cálculo.
+ *   - Timeout de 10s para evitar que el worker se cuelgue indefinidamente.
  * =====================================================================
  */
 
@@ -35,48 +37,96 @@ interface WorkerResponse {
 }
 
 // Cache del módulo WASM cargado
-let wasmReady: Promise<void> | null = null;
+let wasmReady: Promise<typeof import("hash-wasm")> | null = null;
 
-async function ensureWasmReady(): Promise<void> {
+async function ensureWasmReady(): Promise<typeof import("hash-wasm")> {
   if (!wasmReady) {
     wasmReady = (async () => {
-      // hash-wasm carga el WASM internamente en la primera llamada
-      // No necesitamos init explícito, pero hacemos una llamada de prueba
-      const { argon2id } = await import("hash-wasm");
-      // Verificar que la función existe
-      if (typeof argon2id !== "function") {
+      const mod = await import("hash-wasm");
+      if (typeof mod.argon2id !== "function") {
         throw new Error("hash-wasm: argon2id no disponible");
       }
+      return mod;
     })().catch((err) => {
-      wasmReady = null; // Reset para permitir reintento
+      wasmReady = null; // Reset para permitir reintento en la próxima petición
       throw err;
     });
   }
   return wasmReady;
 }
 
+/**
+ * Ejecuta argon2id con un timeout de 10s.
+ * Si excede, rechaza con error claro (no cuelga el worker indefinidamente).
+ */
+function argon2idWithTimeout(params: {
+  password: string;
+  salt: Uint8Array;
+  memoryKiB: number;
+  iterations: number;
+  parallelism: number;
+}): Promise<Uint8Array> {
+  return new Promise(async (resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("Argon2id timeout (>10s) — posible navegador sin WASM"));
+    }, 10_000);
+
+    try {
+      const mod = await ensureWasmReady();
+      const result = await mod.argon2id({
+        password: params.password,
+        salt: params.salt,
+        parallelism: params.parallelism,
+        iterations: params.iterations,
+        memorySize: params.memoryKiB,
+        hashLength: 32,
+        outputType: "binary",
+      });
+      clearTimeout(timeout);
+      resolve(result);
+    } catch (err) {
+      clearTimeout(timeout);
+      reject(err);
+    }
+  });
+}
+
 self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
   const { id, password, salt, memoryKiB, iterations, parallelism } = e.data;
-  try {
-    await ensureWasmReady();
-    const { argon2id } = await import("hash-wasm");
 
-    const rawKey = await argon2id({
+  try {
+    // Copia defensiva del salt: puede llegar detached (transferido).
+    // Si está detached, new Uint8Array(salt) lanza y lo capturamos.
+    let saltCopy: Uint8Array;
+    try {
+      saltCopy = new Uint8Array(salt);
+    } catch {
+      // Salt detached — usar como está si no lo está
+      saltCopy = salt;
+    }
+
+    const rawKey = await argon2idWithTimeout({
       password,
-      // Copiar el salt porque puede ser transferido (detached)
-      salt: new Uint8Array(salt),
-      parallelism,
+      salt: saltCopy,
+      memoryKiB,
       iterations,
-      memorySize: memoryKiB,
-      hashLength: 32,
-      outputType: "binary",
+      parallelism,
     });
+
+    // LIMPIEZA: sobrescribir el salt con ceros antes de responder
+    // (el salt no es secreto, pero buena práctica)
+    try {
+      saltCopy.fill(0);
+    } catch {
+      // no-op si está detached
+    }
 
     const resp: WorkerResponse = {
       id,
       ok: true,
       rawKey: rawKey.buffer as ArrayBuffer,
     };
+    // Transferir el rawKey (detach del lado del worker — se limpia solo)
     (self as DedicatedWorkerGlobalScope).postMessage(resp, [
       rawKey.buffer as ArrayBuffer,
     ]);

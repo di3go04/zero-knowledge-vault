@@ -17,10 +17,15 @@ export async function GET(req: NextRequest) {
   if (!auth.ok) return auth.response;
   const userId = auth.userId;
 
-  const code = req.nextUrl.searchParams.get("code");
-  if (!code || !/^\d{6}$/.test(code)) {
-    return NextResponse.json({ error: "code debe ser 6 dígitos" }, { status: 400 });
+  // Validar query param con Zod
+  const { queryEnrollCodeSchema, validatePayload } = await import("@/lib/validation-schemas");
+  const validation = validatePayload(queryEnrollCodeSchema, {
+    code: req.nextUrl.searchParams.get("code"),
+  });
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
+  const { code } = validation.data;
 
   const device = await db.device.findFirst({
     where: {

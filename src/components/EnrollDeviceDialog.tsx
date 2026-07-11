@@ -23,6 +23,7 @@ import {
   publicKeyFingerprint,
   exportPrivateKeyJwk,
 } from "@/lib/crypto-client";
+import { clearKeyPairRef, clearCryptoKeyRef, zeroBuffer } from "@/lib/memory-zero";
 import { Loader2, Smartphone, ShieldCheck, Fingerprint, Copy, Check, X } from "lucide-react";
 
 interface EnrollDeviceDialogProps {
@@ -70,7 +71,7 @@ export function EnrollDeviceDialog({ open, onOpenChange }: EnrollDeviceDialogPro
   const ephemeralEcdhKeyRef = useRef<CryptoKeyPair | null>(null);
   const sharedKeyRef = useRef<CryptoKey | null>(null);
 
-  // Cleanup al cerrar el diálogo
+  // Cleanup al cerrar el diálogo — zeroing de material criptográfico
   useEffect(() => {
     if (!open) {
       // Reset state
@@ -81,13 +82,21 @@ export function EnrollDeviceDialog({ open, onOpenChange }: EnrollDeviceDialogPro
       setClientFingerprint(null);
       setCopied(false);
 
-      // Limpiar refs criptográficas — desreferenciar para GC
-      // Web Crypto no permite zeroing explícito, pero sin refs el GC
-      // de V8 las recolectará en la próxima pasada.
-      ephemeralEcdhKeyRef.current = null;
-      sharedKeyRef.current = null;
+      // LIMPIEZA DE MEMORIA: desreferenciar y forzar GC si está disponible
+      // Web Crypto no permite zeroing de CryptoKey, pero desreferenciar
+      // permite al GC recolectar en la próxima pasada.
+      clearKeyPairRef(ephemeralEcdhKeyRef);
+      clearCryptoKeyRef(sharedKeyRef);
     }
   }, [open]);
+
+  // Limpieza al desmontar el componente
+  useEffect(() => {
+    return () => {
+      clearKeyPairRef(ephemeralEcdhKeyRef);
+      clearCryptoKeyRef(sharedKeyRef);
+    };
+  }, []);
 
   async function lookupDevice() {
     if (!enrollCode.match(/^\d{6}$/)) {
@@ -186,6 +195,12 @@ export function EnrollDeviceDialog({ open, onOpenChange }: EnrollDeviceDialogPro
         privateKeyJwkStr,
         sharedKey,
       );
+
+      // 5b. LIMPIEZA INMEDIATA: el string privateKeyJwkStr contiene la
+      // privateKey RSA en claro. JS strings son inmutables, pero podemos
+      // sobrescribir la variable local y dejar que el GC la recolecte.
+      // En producción, considerar usar Uint8Array en lugar de string.
+      privateKeyJwkStr = "";
 
       // 6. Enviar al servidor
       const res = await apiFetch("/api/devices/enroll/complete", {

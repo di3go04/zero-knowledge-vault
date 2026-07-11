@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/lib/session-store";
 import { decryptSecret } from "@/lib/crypto-client";
+import { zeroBuffer, clearCryptoKeyRef } from "@/lib/memory-zero";
 import { Loader2, Lock, Eye, EyeOff, Copy, Check } from "lucide-react";
 
 interface ViewSecretDialogProps {
@@ -37,6 +38,17 @@ export interface SecretListItem {
   createdAt: string;
 }
 
+/**
+ * ViewSecretDialog — descifra y muestra un secreto.
+ *
+ * MEJORA Módulo 1 (Memory Zeroing):
+ *   - La AES key derivada del unwrap se guarda en un ref y se limpia
+ *     (clearCryptoKeyRef) al cerrar el diálogo.
+ *   - Los strings descifrados (title, content) se vacían al cerrar.
+ *   - Aunque JS strings son inmutables y el GC los recolecta tarde,
+ *     vaciar el state desreferencia las strings y las hace elegibles
+ *     para GC inmediato.
+ */
 export function ViewSecretDialog({ open, onOpenChange, secret }: ViewSecretDialogProps) {
   const { toast } = useToast();
   const session = useSession();
@@ -47,12 +59,18 @@ export function ViewSecretDialog({ open, onOpenChange, secret }: ViewSecretDialo
   const [content, setContent] = useState<string>("");
   const [copied, setCopied] = useState(false);
 
+  // Refs para limpieza de memoria
+  const aesKeyRef = useRef<CryptoKey | null>(null);
+
   useEffect(() => {
     if (!open || !secret) {
+      // LIMPIEZA: vaciar state y refs criptográficas
       setTitle("");
       setContent("");
       setRevealed(false);
       setCopied(false);
+      // Zeroing de la AES key (desreferenciar — Web Crypto no permite zeroing real)
+      clearCryptoKeyRef(aesKeyRef);
       return;
     }
     let cancelled = false;
@@ -60,7 +78,7 @@ export function ViewSecretDialog({ open, onOpenChange, secret }: ViewSecretDialo
       if (!session.privateKey) return;
       setBusy(true);
       try {
-        const { title: t, content: c } = await decryptSecret(
+        const { title: t, content: c, aesKey } = await decryptSecret(
           secret.wrappedKey,
           secret.encryptedTitle,
           secret.titleIv,
@@ -68,9 +86,14 @@ export function ViewSecretDialog({ open, onOpenChange, secret }: ViewSecretDialo
           secret.dataIv,
           session.privateKey,
         );
-        if (cancelled) return;
+        if (cancelled) {
+          // Si el diálogo se cerró mientras descifraba, limpiar inmediatamente
+          clearCryptoKeyRef(aesKeyRef);
+          return;
+        }
         setTitle(t);
         setContent(c);
+        aesKeyRef.current = aesKey;
       } catch (err: any) {
         toast({
           variant: "destructive",
@@ -88,10 +111,23 @@ export function ViewSecretDialog({ open, onOpenChange, secret }: ViewSecretDialo
     };
   }, [open, secret, session.privateKey, toast, onOpenChange]);
 
+  // Limpieza adicional al desmontar el componente
+  useEffect(() => {
+    return () => {
+      clearCryptoKeyRef(aesKeyRef);
+      setTitle("");
+      setContent("");
+    };
+  }, []);
+
   function handleCopy() {
     navigator.clipboard.writeText(content).then(() => {
       setCopied(true);
       toast({ title: "Copiado al portapapeles" });
+      // Limpiar portapapeles tras 30s (best effort)
+      setTimeout(() => {
+        navigator.clipboard.writeText("").catch(() => {});
+      }, 30_000);
       setTimeout(() => setCopied(false), 1500);
     });
   }

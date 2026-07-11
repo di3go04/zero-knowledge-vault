@@ -28,8 +28,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { generateDecoyLoginResponse } from "@/lib/crypto-server";
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import {
+  recoveryGetBlobSchema,
+  recoveryCompleteSchema,
+  validatePayload,
+} from "@/lib/validation-schemas";
 
 export async function POST(req: NextRequest) {
   let body: any;
@@ -39,11 +42,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const { email, action } = body ?? {};
-
-  if (typeof email !== "string" || !EMAIL_RE.test(email)) {
-    return NextResponse.json({ error: "email inválido" }, { status: 400 });
+  // Validar según el action
+  const action = body?.action;
+  if (action === "get-blob") {
+    const validation = validatePayload(recoveryGetBlobSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+  } else if (action === "complete") {
+    const validation = validatePayload(recoveryCompleteSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+  } else {
+    return NextResponse.json(
+      { error: "action debe ser 'get-blob' o 'complete'" },
+      { status: 400 },
+    );
   }
+
+  const { email } = body as { email: string };
   const normalizedEmail = email.toLowerCase().trim();
 
   const user = await db.user.findUnique({
