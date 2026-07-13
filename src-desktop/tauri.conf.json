@@ -1,0 +1,18 @@
+{
+  "name": "zk-vault-desktop",
+  "version": "1.0.0",
+  "build": {
+    "devPath": "http://localhost:3000",
+    "distDir": "../dist",
+    "withGlobalTauri": true
+  },
+  "tauri": {
+    "bundle": {
+      "active": true,
+      "targets": ["dmg", "appimage", "msi"],
+      "identifier": "io.zk-vault.desktop",
+      "category": "Utilities"
+    },
+    "windows": [{ "title": "ZK Vault", "width": 1024, "height": 768 }]
+  }
+}

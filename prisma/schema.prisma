@@ -1,0 +1,275 @@
+// =====================================================================
+// Zero-Knowledge Password Manager — Prisma Schema
+// =====================================================================
+// El servidor actúa como "crypto-blind store": SOLO almacena blobs
+// cifrados, sales, IVs y llaves públicas. Nunca recibe ni almacena
+// llaves maestras, llaves privadas en claro, ni claves simétricas.
+// =====================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------
+// Usuario: solo metadatos. La contraseña NUNCA se almacena.
+// ---------------------------------------------------------------------
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  keyMaterial     UserKeyMaterial?
+  ownedSecrets    Secret[]
+  secretKeyShares SecretKeyShare[]
+  devices         Device[]
+  auditLogs       AuditLog[]
+  secretComments  SecretComment[]   // MEJORA 38/39
+  ownedTeamVaults TeamVault[]       // MEJORA 39/39
+  teamVaultMembers TeamVaultMember[] // MEJORA 39/39
+}
+
+// ---------------------------------------------------------------------
+// Multi-Device Sync (ECDH)
+// ---------------------------------------------------------------------
+// Cada dispositivo autorizado tiene su propio par ECDH (P-256). La
+// privateKey RSA del usuario se envuelve (wrap) con una llave simétrica
+// derivada vía ECDH entre la publicKey ECDH del dispositivo y una
+// privateKey ECDH efímera del dispositivo que autoriza.
+//
+// Flujo "Enroll Device":
+//   1. Dispositivo B genera par ECDH, muestra código + publicKeyECDH.
+//   2. Dispositivo A (logueado) escanea, deriva ECDH shared secret,
+//      envuelve la privateKey RSA del usuario con ese shared secret.
+//   3. Servidor almacena el blob en Device.wrappedPrivateKeyForDevice.
+//   4. Dispositivo B hace polling, recibe el blob, desenvuelve con su
+//      privateKey ECDH, obtiene la privateKey RSA del usuario.
+//
+// El servidor NUNCA ve la privateKey RSA en claro ni el shared secret
+// ECDH (que solo existe en los dos dispositivos).
+// ---------------------------------------------------------------------
+model Device {
+  id                            String   @id @default(cuid())
+  userId                        String
+  user                          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceName                    String   // etiqueta legible: "Mac de Ana"
+  // Llave pública ECDH P-256 del dispositivo NUEVO (B) — JWK, en claro
+  publicKeyECDH                 String   // JSON
+  publicKeyECDHFingerprint      String   // hex SHA-256 del JWK canonizado
+  // Llave pública ECDH P-256 EFÍMERA del dispositivo AUTORIZADOR (A) — JWK
+  // Se guarda cuando A completa el enrollment, para que B pueda derivar
+  // el shared secret ECDH y desenvolver la wrappedPrivateKey.
+  enrollerPublicKeyECDH         String?  // JSON, null hasta que A completa
+  // PrivateKey RSA del usuario, envuelta con la llave simétrica derivada
+  // vía ECDH entre este dispositivo y el dispositivo que lo autorizó.
+  wrappedPrivateKeyForDevice    String   // base64, AES-256-GCM
+  wrappedPrivateKeyIv           String   // base64, 12 bytes
+  enrollCode                    String?  // código de 6 dígitos (solo durante enrollment)
+  enrollCodeExpiresAt           DateTime?
+  enrolledAt                    DateTime @default(now())
+  lastSeenAt                    DateTime @default(now())
+  revokedAt                     DateTime? // null = activo
+
+  @@index([userId])
+  @@index([enrollCode])
+}
+
+// ---------------------------------------------------------------------
+// Material criptográfico del usuario.
+// - kdfSalt: SAL en claro (base64). Pública. Necesaria para PBKDF2.
+// - kdfIterations: int. Público.
+// - publicKeyJwk: JSON en claro. Llave pública RSA-OAEP.
+// - encryptedPrivateKeyJwk: BLOB cifrado (AES-256-GCM) con la llave
+//   maestra derivada del password del usuario. El servidor NO puede
+//   descifrar esto.
+// - privateKeyIv: IV en claro (base64) usado para cifrar la llave privada.
+// ---------------------------------------------------------------------
+model UserKeyMaterial {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // KDF — Argon2id (preferido) o PBKDF2 (legacy)
+  kdfAlgorithm           String   @default("argon2id") // "argon2id" | "pbkdf2"
+  kdfSalt                String   // base64, público
+  kdfIterations          Int      // Argon2id: t (time). PBKDF2: iteraciones.
+  kdfMemoryKiB           Int?     // Argon2id: m (memory). PBKDF2: null.
+  kdfParallelism         Int?     // Argon2id: p (parallelism). PBKDF2: null.
+  publicKeyJwk           String   // JSON string, público
+  publicKeyFingerprint   String   // hex SHA-256 del JWK canonizado — para TOFU y detección de sustitución
+  popSignature           String   // base64 — firma RSA-PSS de {email, publicKeyFingerprint, kdfSalt} con la privateKey
+  popSignatureHash       String   // "SHA-256" — algoritmo usado para la firma PoP (auditabilidad)
+  encryptedPrivateKeyJwk String   // base64, AES-256-GCM ciphertext con masterKey
+  privateKeyIv           String   // base64, público
+  mlKemPublicKey          String?  // base64, ML-KEM-768 public key (1184 bytes)
+  encryptedMlKemPrivateKey String? // base64, AES-256-GCM ciphertext
+  mlKemPrivateKeyIv       String?  // base64, 12 bytes
+
+  // Recovery Key (BIP-39) — backup cifrado de la privateKey RSA
+  // El usuario recibe 24 palabras en el registro. Estas se derivan a
+  // una llave AES-256 que cifra la MISMA privateKey RSA. Si el usuario
+  // olvida su contraseña maestra, puede usar la frase de 24 palabras
+  // para descifrar este blob y recuperar su cuenta.
+  // El servidor NUNCA ve las 24 palabras — solo el blob cifrado.
+  recoverySalt           String?  // base64, salt para derivar recovery key
+  recoveryIterations     Int?     // PBKDF2 iteraciones para recovery key (puede ser alto, no bloquea UI)
+  encryptedPrivateKeyForRecovery String? // base64, AES-256-GCM con recovery key
+  recoveryIv             String?  // base64, 12 bytes
+  recoveryEnabled        Boolean  @default(false)
+
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([publicKeyFingerprint])
+}
+
+// ---------------------------------------------------------------------
+// Secreto: contenido cifrado con AES-256-GCM.
+// - El título TAMBIÉN va cifrado (Zero-Knowledge estricto).
+// - encryptedData / encryptedTitle: blobs AES-256-GCM.
+// - El servidor no conoce ni el título ni el contenido.
+// ---------------------------------------------------------------------
+model Secret {
+  id             String   @id @default(cuid())
+  ownerId        String
+  owner          User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  encryptedTitle String   // base64, AES-256-GCM
+  titleIv        String   // base64
+  encryptedData  String   // base64, AES-256-GCM
+  dataIv         String   // base64
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  keyShares SecretKeyShare[]
+  versions SecretVersion[]   // MEJORA 36/39
+  comments SecretComment[]   // MEJORA 38/39
+
+  @@index([ownerId, createdAt])  // MEJORA 20/39: paginación por owner
+}
+
+// ---------------------------------------------------------------------
+// Share: la clave simétrica AES que desencripta el secreto, "envuelta"
+// (wrapped) con la llave PÚBLICA RSA-OAEP del destinatario.
+// - Solo el destinatario puede desenvolverla con su llave privada.
+// - El servidor nunca ve la clave simétrica en claro.
+// - El propietario del secreto también tiene un share para sí mismo.
+// ---------------------------------------------------------------------
+
+// ---------------------------------------------------------------------
+// Audit Log cifrado (Zero-Knowledge Logging)
+// ---------------------------------------------------------------------
+// Los logs se generan y CIFRAN en el cliente (AES-256-GCM con una llave
+// de auditoría derivada de la masterKey del usuario). El servidor solo
+// almacena blobs cifrados + metadata mínima (timestamp, tipo de evento
+// cifrado). Esto permite auditoría forense sin filtrar información
+// sensible en logs del servidor.
+//
+// La llave de auditoría es distinta de la masterKey para evitar que un
+// atacante con la masterKey (ej. via sesión abierta) pueda leer los logs
+// históricos. Se deriva como HKDF(masterKey, "audit-log-v1").
+// ---------------------------------------------------------------------
+model AuditLog {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  encryptedEvent  String   // base64, AES-256-GCM
+  eventIv         String   // base64, 12 bytes
+  // MEJORA 3/50: cifrar eventCategory para minimizar metadata en servidor
+  encryptedCategory String @default("") // base64, AES-256-GCM (vacío = legacy)
+  categoryIv      String   @default("")
+  // Mantener category en claro para compatibilidad, pero permitir modo cifrado
+  eventCategory   String   // "auth" | "secret" | "share" | "rotation" | "device"
+  // MEJORA 31/50: hash chaining para tamper-evidence
+  prevHash        String?  // SHA-256 del log anterior del mismo usuario
+  logHash         String?  // SHA-256 de (prevHash + encryptedEvent + createdAt)
+  createdAt       DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([eventCategory])
+}
+
+// ---------------------------------------------------------------------
+// MEJORA 34/39: Roles de share — read-only vs admin
+// MEJORA 37/39: Notificaciones de share — seenAt para badge "Nuevo"
+// ---------------------------------------------------------------------
+model SecretKeyShare {
+  id                  String   @id @default(cuid())
+  secretId            String
+  secret              Secret   @relation(fields: [secretId], references: [id], onDelete: Cascade)
+  recipientId         String
+  recipient           User     @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  wrappedSymmetricKey String   // base64, RSA-OAEP(AES key)
+  role                String   @default("readonly") // "readonly" | "admin" — MEJORA 34/39
+  seenAt              DateTime? // null = no visto — MEJORA 37/39
+  createdAt           DateTime @default(now())
+
+  @@unique([secretId, recipientId])
+}
+
+// ---------------------------------------------------------------------
+// MEJORA 36/39: Historial de versiones de secreto
+// ---------------------------------------------------------------------
+model SecretVersion {
+  id             String   @id @default(cuid())
+  secretId       String
+  secret         Secret   @relation(fields: [secretId], references: [id], onDelete: Cascade)
+  encryptedData  String   // base64, AES-256-GCM
+  dataIv         String   // base64
+  version        Int      // número de versión
+  createdAt      DateTime @default(now())
+
+  @@index([secretId, version])
+}
+
+// ---------------------------------------------------------------------
+// MEJORA 38/39: Comentarios cifrados en secretos
+// ---------------------------------------------------------------------
+model SecretComment {
+  id             String   @id @default(cuid())
+  secretId       String
+  secret         Secret   @relation(fields: [secretId], references: [id], onDelete: Cascade)
+  authorId       String
+  author         User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  encryptedText  String   // base64, AES-256-GCM
+  textIv         String   // base64, 12 bytes
+  createdAt      DateTime @default(now())
+
+  @@index([secretId, createdAt])
+}
+
+// ---------------------------------------------------------------------
+// MEJORA 39/39: Bóvedas de equipo — grupo con llave AES compartida rotativa
+// ---------------------------------------------------------------------
+model TeamVault {
+  id              String   @id @default(cuid())
+  name            String
+  ownerId         String
+  owner           User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  encryptedVaultKey String // AES key del team vault, cifrada con publicKey del owner
+  vaultKeyIv      String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  members TeamVaultMember[]
+
+  @@index([ownerId])
+}
+
+model TeamVaultMember {
+  id              String   @id @default(cuid())
+  teamVaultId     String
+  teamVault       TeamVault @relation(fields: [teamVaultId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role            String   @default("member") // "admin" | "member"
+  wrappedVaultKey String   // AES key envuelta con publicKey del miembro
+  createdAt       DateTime @default(now())
+
+  @@unique([teamVaultId, userId])
+  @@index([userId])
+}

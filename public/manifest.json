@@ -1,0 +1,13 @@
+/// <reference lib="webworker" />
+{
+  "name": "Zero-Knowledge Vault",
+  "short_name": "ZK Vault",
+  "description": "Gestor de contraseñas Zero-Knowledge con cifrado end-to-end",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0e1a",
+  "theme_color": "#10b981",
+  "icons": [
+    { "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
