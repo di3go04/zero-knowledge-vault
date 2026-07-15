@@ -387,3 +387,14 @@ export const pathIdSchema = z
   .min(1, "id requerido")
   .max(100, "id demasiado largo")
   .regex(/^[a-zA-Z0-9_-]+$/, "id debe ser alfanumérico");
+
+// -------- /api/emergency-access --------
+export const createEmergencyAccessSchema = z.object({
+  beneficiaryEmail: z.string().email().min(3).max(320),
+  message: z.string().max(500).optional(),
+  delayHours: z.number().int().min(1).max(8760).default(72),
+});
+
+export const claimEmergencyAccessSchema = z.object({
+  action: z.enum(["claim", "cancel", "recover"]),
+});

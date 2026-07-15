@@ -30,7 +30,9 @@ model User {
   secretKeyShares     SecretKeyShare[]
   devices             Device[]
   auditLogs           AuditLog[]
-  webAuthnCredentials WebAuthnCredential[]
+  webAuthnCredentials     WebAuthnCredential[]
+  emergencyGrants         EmergencyAccess[]   @relation("EmergencyGrantor")
+  emergencyBeneficiaries  EmergencyAccess[]   @relation("EmergencyBeneficiary")
 }
 
 // ---------------------------------------------------------------------
@@ -132,6 +134,39 @@ model UserKeyMaterial {
   updatedAt              DateTime @updatedAt
 
   @@index([publicKeyFingerprint])
+}
+
+// ---------------------------------------------------------------------
+// Emergency Access / Herencia Digital
+// ---------------------------------------------------------------------
+// Permite a un usuario designar herederos que pueden recuperar el acceso
+// a su bóveda tras un periodo de inactividad o con time-lock + aprobación.
+//
+// Flujo:
+//   1. Owner crea un grant: especifica beneficiary, delayHours, message.
+//   2. Beneficiary reclama el grant → se inicia el time-lock.
+//   3. Durante el time-lock, el owner puede cancelar.
+//   4. Pasado el time-lock, el beneficiary puede recuperar la bóveda.
+//      El servidor entrega el encryptedPrivateKeyForRecovery (si existe)
+//      o el wrappedPrivateKey de un dispositivo.
+// ---------------------------------------------------------------------
+model EmergencyAccess {
+  id              String   @id @default(cuid())
+  grantorId       String
+  grantor         User     @relation("EmergencyGrantor", fields: [grantorId], references: [id], onDelete: Cascade)
+  beneficiaryId   String
+  beneficiary     User     @relation("EmergencyBeneficiary", fields: [beneficiaryId], references: [id], onDelete: Cascade)
+  message         String?  // Mensaje del grantor al beneficiary
+  delayHours      Int      @default(72) // 72h por defecto
+  // Estados: "pending" → "active" (time-lock started) → "approved" (reclamado) → "cancelled"
+  status          String   @default("pending") // pending | active | cancelled | completed
+  claimedAt       DateTime? // Cuando el beneficiary inició el reclamo
+  completedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([grantorId, beneficiaryId])
+  @@index([beneficiaryId])
 }
 
 // ---------------------------------------------------------------------
