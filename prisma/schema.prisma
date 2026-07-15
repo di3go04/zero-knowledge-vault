@@ -25,11 +25,12 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  keyMaterial     UserKeyMaterial?
-  ownedSecrets    Secret[]
-  secretKeyShares SecretKeyShare[]
-  devices         Device[]
-  auditLogs       AuditLog[]
+  keyMaterial         UserKeyMaterial?
+  ownedSecrets        Secret[]
+  secretKeyShares     SecretKeyShare[]
+  devices             Device[]
+  auditLogs           AuditLog[]
+  webAuthnCredentials WebAuthnCredential[]
 }
 
 // ---------------------------------------------------------------------
@@ -131,6 +132,30 @@ model UserKeyMaterial {
   updatedAt              DateTime @updatedAt
 
   @@index([publicKeyFingerprint])
+}
+
+// ---------------------------------------------------------------------
+// WebAuthn (FIDO2 / Passkeys) — autenticación sin contraseña
+// ---------------------------------------------------------------------
+// Soporta tanto hardware tokens (YubiKey) como authenticators de
+// plataforma (Touch ID, Windows Hello, Face ID, passkeys).
+// Cada credencial pertenece a un usuario y se usa como 2FA o como
+// método de login sin contraseña.
+// ---------------------------------------------------------------------
+model WebAuthnCredential {
+  id              String   @id
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialId    String   @unique
+  publicKey       String   // base64, llave pública cose
+  counter         BigInt  @default(0)
+  transports      String   // JSON array: ["usb", "nfc", "ble", "internal"]
+  deviceName      String?  // Etiqueta: "YubiKey 5C NFC", "iPhone Passkey"
+  credentialType  String   @default("platform") // "platform" = passkey, "cross-platform" = YubiKey
+  createdAt       DateTime @default(now())
+  lastUsedAt      DateTime @default(now())
+
+  @@index([userId])
 }
 
 // ---------------------------------------------------------------------
