@@ -55,18 +55,25 @@ model Device {
   id                            String   @id @default(cuid())
   userId                        String
   user                          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  deviceName                    String   // etiqueta legible: "Mac de Ana"
+  deviceName                    String
   // Llave pública ECDH P-256 del dispositivo NUEVO (B) — JWK, en claro
   publicKeyECDH                 String   // JSON
   publicKeyECDHFingerprint      String   // hex SHA-256 del JWK canonizado
+  // Post-Quantum: Llave pública Kyber ML-KEM 768 del dispositivo B (base64)
+  publicKeyKyber                String?  // base64, null si no soporta PQ
+  // Ciphertext Kyber generado por dispositivo A para que B pueda decapsular
+  kyberCiphertext               String?  // base64, null hasta que A completa
   // Llave pública ECDH P-256 EFÍMERA del dispositivo AUTORIZADOR (A) — JWK
   // Se guarda cuando A completa el enrollment, para que B pueda derivar
   // el shared secret ECDH y desenvolver la wrappedPrivateKey.
   enrollerPublicKeyECDH         String?  // JSON, null hasta que A completa
   // PrivateKey RSA del usuario, envuelta con la llave simétrica derivada
   // vía ECDH entre este dispositivo y el dispositivo que lo autorizó.
+  // Si el envío es híbrido, la llave AES deriva de ECDH + Kyber combinados.
   wrappedPrivateKeyForDevice    String   // base64, AES-256-GCM
   wrappedPrivateKeyIv           String   // base64, 12 bytes
+  // Algoritmo usado: "ecdh" (clásico) o "hybrid-ecdh-kyber768" (post-quántico)
+  keyExchangeAlgorithm          String   @default("hybrid-ecdh-kyber768")
   enrollCode                    String?  // código de 6 dígitos (solo durante enrollment)
   enrollCodeExpiresAt           DateTime?
   enrolledAt                    DateTime @default(now())

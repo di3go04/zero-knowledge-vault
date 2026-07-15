@@ -1229,10 +1229,151 @@ export async function verifyChallenge(params: {
  */
 export function generateEnrollCode(): string {
   const bytes = randomBytes(4);
-  // Convertir a número de 6 dígitos (mod 1_000_000)
   const num =
     ((bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3]) >>> 0;
   return (num % 1_000_000).toString().padStart(6, "0");
+}
+
+// =========================================================================
+// 13c. POST-QUANTUM KEM (Kyber/ML-KEM 768) — Hybrid Key Exchange
+// =========================================================================
+//
+// Mejora #1: Integración de ML-KEM (CRYSTALS-Kyber) como KEM post-quántico
+// junto a ECDH P-256 para ofrecer cifrado híbrido (ECDH + Kyber).
+//
+// Esquema híbrido:
+//   1. Cada dispositivo genera un par ECDH P-256 Y un par Kyber ML-KEM 768.
+//   2. Durante el enrollment, el dispositivo A (logueado) deriva DOS shared
+//      secrets: ECDH(A.priv × B.pub) + Kyber encapsulate(B.pubKyber).
+//   3. Ambos shared secrets se combinan vía SHA-256 para producir la llave
+//      AES final que envuelve la privateKey RSA del usuario.
+//   4. Un atacante que rompa ECDH (computación cuántica) aún necesitaría
+//      romper Kyber, y viceversa. Mientras AL MENOS UNO de los dos
+//      algoritmos sea seguro, el secreto compuesto es seguro.
+//
+// ML-KEM 768 (~NIST security level 3) es el parámetro recomendado para
+// un balance seguridad/rendimiento. Level 5 (1024) está disponible si se
+// necesita máxima seguridad.
+//
+// Esta integración es la primera capa de defensa post-quántica. En el futuro,
+// Kyber podría reemplazar completamente a ECDH cuando Web Crypto lo soporte
+// nativamente.
+// =========================================================================
+
+export type KyberSecurityLevel = 512 | 768 | 1024;
+
+const KYBER_DEFAULT_LEVEL: KyberSecurityLevel = 768;
+
+export interface KyberKeyPair {
+  publicKey: Uint8Array;
+  privateKey: Uint8Array;
+}
+
+export interface KyberCiphertext {
+  ciphertext: Uint8Array;
+  sharedSecret: Uint8Array;
+}
+
+/**
+ * Genera un par de llaves Kyber ML-KEM en el nivel especificado.
+ * ML-KEM 768 (recomendado) produce 1184 bytes de publicKey y 2400 bytes
+ * de privateKey. Todo en memoria, nunca sale del navegador.
+ */
+export async function generateKyberKeyPair(
+  level: KyberSecurityLevel = KYBER_DEFAULT_LEVEL,
+): Promise<KyberKeyPair> {
+  const { default: Kyber } = await import("crystals-kyber-js");
+  const kyber = new Kyber(level);
+  const { publicKey, privateKey } = kyber.generateKeypair();
+  return { publicKey: new Uint8Array(publicKey), privateKey: new Uint8Array(privateKey) };
+}
+
+/**
+ * Encapsula: genera un ciphertext + shared secret a partir de una
+ * publicKey Kyber. El ciphertext se envía al peer; el shared secret
+ * se combina con el ECDH shared secret para formar la llave híbrida.
+ */
+export async function kyberEncapsulate(
+  publicKey: Uint8Array,
+  level: KyberSecurityLevel = KYBER_DEFAULT_LEVEL,
+): Promise<KyberCiphertext> {
+  const { default: Kyber } = await import("crystals-kyber-js");
+  const kyber = new Kyber(level);
+  const { cipherText, sharedSecret } = kyber.encapsulate(publicKey);
+  return { ciphertext: new Uint8Array(cipherText), sharedSecret: new Uint8Array(sharedSecret) };
+}
+
+/**
+ * Decapsula: recupera el shared secret a partir de un ciphertext +
+ * privateKey Kyber. Usado por el peer para derivar el mismo shared secret.
+ */
+export async function kyberDecapsulate(
+  ciphertext: Uint8Array,
+  privateKey: Uint8Array,
+  level: KyberSecurityLevel = KYBER_DEFAULT_LEVEL,
+): Promise<Uint8Array> {
+  const { default: Kyber } = await import("crystals-kyber-js");
+  const kyber = new Kyber(level);
+  const sharedSecret = kyber.decapsulate(ciphertext, privateKey);
+  return new Uint8Array(sharedSecret);
+}
+
+/**
+ * Deriva una llave AES-256-GCM a partir de la combinación híbrida
+ * de dos shared secrets: ECDH + Kyber. Se concatenan y se hashean
+ * con SHA-256 para producir una única llave de 256 bits.
+ *
+ * Zeroeamos los buffers intermedios después de usarlos.
+ * Si Kyber no está disponible, se usa solo ECDH (fallback seguro).
+ */
+export async function deriveHybridSharedAesKey(
+  ecdhSharedKey: CryptoKey,
+  kyberSharedSecret: Uint8Array | null,
+): Promise<CryptoKey> {
+  const ecdhRaw = await crypto.subtle.exportKey("raw", ecdhSharedKey);
+  const combined = new Uint8Array(ecdhRaw.byteLength + (kyberSharedSecret?.length ?? 0));
+  combined.set(new Uint8Array(ecdhRaw), 0);
+  zeroBuffer(ecdhRaw);
+  if (kyberSharedSecret) {
+    combined.set(kyberSharedSecret, ecdhRaw.byteLength);
+    zeroBuffer(kyberSharedSecret);
+  }
+  const hash = await crypto.subtle.digest("SHA-256", combined);
+  zeroBuffer(combined);
+  return crypto.subtle.importKey(
+    "raw",
+    hash,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+/**
+ * Serializa una Kyber publicKey a base64 para enviarla al servidor
+ * como parte del enrollment de dispositivo.
+ */
+export function kyberPublicKeyToBase64(publicKey: Uint8Array): string {
+  return bufToBase64(publicKey);
+}
+
+/**
+ * Deserializa una Kyber publicKey desde base64.
+ */
+export function kyberPublicKeyFromBase64(b64: string): Uint8Array {
+  return base64ToBuf(b64);
+}
+
+/**
+ * Serializa una Kyber ciphertext a base64 para almacenar en el servidor
+ * junto con el enrollment (el ciphertext lo necesita el dispositivo B).
+ */
+export function kyberCiphertextToBase64(ciphertext: Uint8Array): string {
+  return bufToBase64(ciphertext);
+}
+
+export function kyberCiphertextFromBase64(b64: string): Uint8Array {
+  return base64ToBuf(b64);
 }
 
 // =========================================================================
