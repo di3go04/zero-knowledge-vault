@@ -48,6 +48,9 @@ export async function GET(req: NextRequest) {
     titleIv: s.secret.titleIv,
     encryptedData: s.secret.encryptedData,
     dataIv: s.secret.dataIv,
+    encryptedMetadata: s.secret.encryptedMetadata,
+    metadataIv: s.secret.metadataIv,
+    secretType: s.secret.secretType,
     wrappedKey: s.wrappedSymmetricKey,
     createdAt: s.secret.createdAt,
     sharedAt: s.createdAt,
@@ -81,7 +84,7 @@ export async function POST(req: NextRequest) {
   if (!validation.success) {
     return NextResponse.json({ error: validation.error }, { status: 400 });
   }
-  const { encryptedTitle, titleIv, encryptedData, dataIv, wrappedKeyForOwner } = validation.data;
+  const { encryptedTitle, titleIv, encryptedData, dataIv, wrappedKeyForOwner, secretType, encryptedMetadata, metadataIv } = validation.data;
 
   const user = await db.user.findUnique({ where: { id: userId } });
   if (!user) {
@@ -96,6 +99,9 @@ export async function POST(req: NextRequest) {
         titleIv,
         encryptedData,
         dataIv,
+        secretType,
+        encryptedMetadata: encryptedMetadata ?? null,
+        metadataIv: metadataIv ?? null,
       },
     });
     await tx.secretKeyShare.create({

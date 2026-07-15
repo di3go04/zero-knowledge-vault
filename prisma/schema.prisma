@@ -228,6 +228,9 @@ model Secret {
   titleIv        String   // base64
   encryptedData  String   // base64, AES-256-GCM
   dataIv         String   // base64
+  encryptedMetadata String? // base64, AES-256-GCM — tags, URLs, notes cifrados
+  metadataIv     String?  // base64
+  secretType     String   @default("password") // password | note | ssh-key | api-key | certificate | database
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

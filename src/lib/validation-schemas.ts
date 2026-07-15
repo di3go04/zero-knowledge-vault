@@ -144,12 +144,17 @@ const ecdsaSignature = base64String.refine(
 // ---------------------------------------------------------------------------
 
 // -------- /api/secrets --------
+export const SECRET_TYPES = ["password", "note", "ssh-key", "api-key", "certificate", "database"] as const;
+
 export const createSecretSchema = z.object({
   encryptedTitle: aesGcmBlob(28, 64 * 1024),
   titleIv: aesGcmIv,
   encryptedData: aesGcmBlob(28, 64 * 1024),
   dataIv: aesGcmIv,
   wrappedKeyForOwner: rsaWrappedKey,
+  secretType: z.enum(SECRET_TYPES).default("password"),
+  encryptedMetadata: aesGcmBlob(28, 64 * 1024).optional(),
+  metadataIv: aesGcmIv.optional(),
 });
 
 // -------- /api/shares --------
