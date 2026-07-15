@@ -314,11 +314,15 @@ export async function aesDecrypt(
   ciphertextB64: string,
   ivB64: string,
 ): Promise<string> {
+  const ctBuf = base64ToBuf(ciphertextB64);
+  const ivBuf = base64ToBuf(ivB64);
   const pt = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: base64ToBuf(ivB64) as BufferSource },
+    { name: "AES-GCM", iv: ivBuf as BufferSource },
     key,
-    base64ToBuf(ciphertextB64) as BufferSource,
+    ctBuf as BufferSource,
   );
+  zeroBuffer(ctBuf);
+  zeroBuffer(ivBuf);
   return new TextDecoder().decode(pt);
 }
 
@@ -430,7 +434,13 @@ export async function decryptPrivateKey(
 ): Promise<CryptoKey> {
   const jwkStr = await aesDecrypt(masterKey, encryptedJwkB64, ivB64);
   const jwk = JSON.parse(jwkStr) as JsonWebKey;
-  return importPrivateKeyJwk(jwk);
+  const key = await importPrivateKeyJwk(jwk);
+  // Zero the JWK string and parsed object after import
+  zeroBuffer(new TextEncoder().encode(jwkStr));
+  for (const k of Object.keys(jwk)) {
+    (jwk as any)[k] = "";
+  }
+  return key;
 }
 
 // ---------------------------------------------------------------------------
@@ -813,19 +823,20 @@ export async function shareSecretWithRecipient(
   ownerPrivateKey: CryptoKey,
   recipientPublicKey: CryptoKey,
 ): Promise<string> {
-  // 1. Owner desenvuelve SU wrappedKey -> obtiene AES key cruda (bytes)
+  const wrappedBuf = base64ToBuf(ownerWrappedKeyB64);
   const rawAesBytes = await crypto.subtle.decrypt(
     { name: "RSA-OAEP" },
     ownerPrivateKey,
-    base64ToBuf(ownerWrappedKeyB64) as BufferSource,
+    wrappedBuf as BufferSource,
   );
+  zeroBuffer(wrappedBuf);
 
-  // 2. Re-envuelve con la llave PÚBLICA del destinatario
   const rewrapped = await crypto.subtle.encrypt(
     { name: "RSA-OAEP" },
     recipientPublicKey,
     rawAesBytes,
   );
+  zeroBuffer(new Uint8Array(rawAesBytes));
 
   return bufToBase64(rewrapped);
 }

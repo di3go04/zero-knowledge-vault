@@ -170,6 +170,27 @@ model EmergencyAccess {
 }
 
 // ---------------------------------------------------------------------
+// Password Policies — configurables por organización
+// ---------------------------------------------------------------------
+model PasswordPolicy {
+  id              String   @id @default(cuid())
+  name            String   @default("default")
+  minLength       Int      @default(12)
+  maxLength       Int      @default(128)
+  requireUppercase Boolean @default(true)
+  requireLowercase Boolean @default(true)
+  requireNumbers  Boolean  @default(true)
+  requireSymbols  Boolean  @default(true)
+  expirationDays  Int      @default(90)
+  minUniqueChars  Int      @default(6)
+  historySize     Int      @default(5) // No repetir últimas N contraseñas
+  maxFailedAttempts Int    @default(5)
+  lockoutMinutes  Int      @default(15)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------
 // WebAuthn (FIDO2 / Passkeys) — autenticación sin contraseña
 // ---------------------------------------------------------------------
 // Soporta tanto hardware tokens (YubiKey) como authenticators de
