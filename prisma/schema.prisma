@@ -123,6 +123,10 @@ model UserKeyMaterial {
   recoveryIv             String?  // base64, 12 bytes
   recoveryEnabled        Boolean  @default(false)
 
+  // Master key rotation: cada 30 días el usuario debe rotar su contraseña
+  // maestra para limitar el daño si una masterKey fue comprometida.
+  lastKeyRotationAt      DateTime @default(now())
+
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 

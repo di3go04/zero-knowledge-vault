@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
       encryptedPrivateKeyJwk: newEncryptedPrivateKeyJwk,
       privateKeyIv: newPrivateKeyIv,
       popSignature: newPopSignature,
-      // publicKeyJwk y publicKeyFingerprint NO cambian
+      lastKeyRotationAt: new Date(),
     },
   });
 
