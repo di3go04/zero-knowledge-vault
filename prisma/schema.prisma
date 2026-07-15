@@ -33,6 +33,14 @@ model User {
   webAuthnCredentials     WebAuthnCredential[]
   emergencyGrants         EmergencyAccess[]   @relation("EmergencyGrantor")
   emergencyBeneficiaries  EmergencyAccess[]   @relation("EmergencyBeneficiary")
+  scimUser                ScimUser?
+  userRoles               UserRole[]
+  groupMemberships        GroupMember[]
+  approvalRequests        ApprovalRequest[]   @relation("ApprovalRequester")
+  approvalApprovals       ApprovalRequest[]   @relation("ApprovalApprover")
+  breakGlassAccesses      BreakGlassAccess[]  @relation("BreakGlassRequester")
+  breakGlassApprovals     BreakGlassAccess[]  @relation("BreakGlassApprover")
+  complianceReports       ComplianceReport[]
 }
 
 // ---------------------------------------------------------------------
@@ -288,4 +296,209 @@ model AuditLog {
   @@index([userId, createdAt])
   @@index([eventCategory])
   @@index([previousEventHash])
+}
+
+// ---------------------------------------------------------------------
+// Enterprise Feature Models (#21–#30)
+// ---------------------------------------------------------------------
+
+// #21 — SCIM 2.0 Provisioning
+model ScimUser {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  externalId      String   @unique
+  userName        String   @unique
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([externalId])
+  @@index([userName])
+}
+
+// #22 — SAML 2.0 / OIDC SSO Provider
+model SsoProvider {
+  id              String   @id @default(cuid())
+  providerType    String   // "saml" | "oidc"
+  providerName    String   @unique
+  issuerUrl       String
+  clientId        String?
+  clientSecret    String?
+  metadataUrl     String?
+  metadataXml     String?
+  attributeMapping String? // JSON
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// #23 — LDAP / Active Directory Connector
+model DirectoryConnector {
+  id                String   @id @default(cuid())
+  name              String   @unique
+  providerType      String   // "ldap" | "active-directory"
+  url               String
+  baseDn            String
+  bindDn            String
+  bindPassword      String   // encrypted at rest
+  userSearchFilter  String   @default("(objectClass=person)")
+  groupSearchFilter String   @default("(objectClass=group)")
+  syncIntervalSec   Int      @default(3600)
+  enabled           Boolean  @default(true)
+  lastSyncAt        DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// #24 — RBAC Granular
+model Role {
+  id              String   @id @default(cuid())
+  name            String   @unique
+  description     String?
+  isSystem        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  permissions     Permission[]
+  userRoles       UserRole[]
+}
+
+model Permission {
+  id              String   @id @default(cuid())
+  roleId          String
+  role            Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  action          String
+  resource        String
+  conditions      String?  // JSON — future ABAC conditions
+  createdAt       DateTime @default(now())
+
+  @@unique([roleId, action, resource])
+}
+
+model UserRole {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId          String
+  role            Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  assignedBy      String?
+  createdAt       DateTime @default(now())
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+}
+
+// #25 — Group Policies
+model UserGroup {
+  id              String   @id @default(cuid())
+  name            String   @unique
+  description     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  members         GroupMember[]
+  policies        GroupPolicy[]
+}
+
+model GroupMember {
+  id              String   @id @default(cuid())
+  groupId         String
+  group           UserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role            String   @default("member") // "member" | "admin"
+  createdAt       DateTime @default(now())
+
+  @@unique([groupId, userId])
+  @@index([groupId])
+  @@index([userId])
+}
+
+model GroupPolicy {
+  id              String   @id @default(cuid())
+  groupId         String
+  group           UserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  policyType      String   // "password" | "session" | "mfa" | "sharing"
+  policyValue     String   // JSON
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([groupId, policyType])
+  @@index([groupId])
+}
+
+// #26 — Approval Workflows
+model ApprovalRequest {
+  id              String   @id @default(cuid())
+  requesterId     String
+  requester       User     @relation("ApprovalRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  action          String   // "share" | "export" | "emergency-access" | "admin-action"
+  resourceType    String   // "secret" | "vault" | "setting"
+  resourceId      String?
+  reason          String
+  status          String   @default("pending") // "pending" | "approved" | "rejected" | "cancelled"
+  approvedById    String?
+  approvedBy      User?    @relation("ApprovalApprover", fields: [approvedById], references: [id])
+  approverComment String?
+  expiresAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([requesterId])
+  @@index([status])
+}
+
+// #27 — Dual Control / Break-Glass
+model BreakGlassAccess {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation("BreakGlassRequester", fields: [userId], references: [id], onDelete: Cascade)
+  reason          String
+  status          String   @default("pending") // "pending" | "approved" | "denied" | "expired"
+  approverId      String?
+  approver        User?    @relation("BreakGlassApprover", fields: [approverId], references: [id])
+  approvedAt      DateTime?
+  expiresAt       DateTime?
+  accessToken     String?  // HMAC token temporal
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+// #28 — Webhooks for SIEM
+model WebhookConfig {
+  id              String   @id @default(cuid())
+  name            String
+  url             String
+  secret          String?  // HMAC secret for payload signing
+  events          String   // JSON array — ["auth:login", "secret:read", ...]
+  enabled         Boolean  @default(true)
+  retryCount      Int      @default(3)
+  timeoutMs       Int      @default(5000)
+  lastTriggeredAt DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// #30 — Compliance Reports
+model ComplianceReport {
+  id              String   @id @default(cuid())
+  reportType      String   // "soc2" | "hipaa" | "gdpr" | "custom" | "admin-audit"
+  periodStart     DateTime
+  periodEnd       DateTime
+  status          String   @default("pending") // "pending" | "generating" | "completed" | "failed"
+  parameters      String?  // JSON
+  resultData      String?  // JSON
+  generatedById   String?
+  generatedBy     User?    @relation(fields: [generatedById], references: [id])
+  createdAt       DateTime @default(now())
+  completedAt     DateTime?
+
+  @@index([reportType])
+  @@index([status])
 }

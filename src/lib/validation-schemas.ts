@@ -404,3 +404,137 @@ export const createEmergencyAccessSchema = z.object({
 export const claimEmergencyAccessSchema = z.object({
   action: z.enum(["claim", "cancel", "recover"]),
 });
+
+// ---------------------------------------------------------------------------
+// Enterprise Feature Schemas (#21–#30)
+// ---------------------------------------------------------------------------
+
+// #21 — SCIM 2.0
+export const scimUserSchema = z.object({
+  schemas: z.array(z.string()).optional(),
+  userName: z.string().min(1).max(255),
+  name: z.object({
+    givenName: z.string().optional(),
+    familyName: z.string().optional(),
+  }).optional(),
+  emails: z.array(z.object({
+    value: z.string().email(),
+    primary: z.boolean().optional(),
+  })).optional(),
+  active: z.boolean().optional(),
+  externalId: z.string().max(255).optional(),
+});
+
+// #22 — SSO Provider
+export const ssoProviderSchema = z.object({
+  providerType: z.enum(["saml", "oidc"]),
+  providerName: z.string().min(1).max(100),
+  issuerUrl: z.string().url().max(500),
+  clientId: z.string().max(500).optional(),
+  clientSecret: z.string().max(2000).optional(),
+  metadataUrl: z.string().url().max(500).optional(),
+  metadataXml: z.string().max(100_000).optional(),
+  attributeMapping: z.string().max(10_000).optional(),
+  enabled: z.boolean().optional(),
+});
+
+export const ssoProviderUpdateSchema = ssoProviderSchema.partial();
+
+// #23 — Directory Connector
+export const directoryConnectorSchema = z.object({
+  name: z.string().min(1).max(100),
+  providerType: z.enum(["ldap", "active-directory"]),
+  url: z.string().min(1).max(500),
+  baseDn: z.string().min(1).max(500),
+  bindDn: z.string().min(1).max(500),
+  bindPassword: z.string().min(1).max(2000),
+  userSearchFilter: z.string().max(500).optional(),
+  groupSearchFilter: z.string().max(500).optional(),
+  syncIntervalSec: z.number().int().min(60).max(86400).optional(),
+  enabled: z.boolean().optional(),
+});
+
+export const directoryConnectorUpdateSchema = directoryConnectorSchema.partial();
+
+// #24 — RBAC
+export const roleSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+  isSystem: z.boolean().optional(),
+});
+
+export const roleUpdateSchema = roleSchema.partial();
+
+export const permissionSchema = z.object({
+  action: z.string().min(1).max(100),
+  resource: z.string().min(1).max(100),
+  conditions: z.string().max(5000).optional(),
+});
+
+export const userRoleAssignmentSchema = z.object({
+  roleId: z.string().min(1).max(100),
+});
+
+// #25 — Groups
+export const groupSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+});
+
+export const groupUpdateSchema = groupSchema.partial();
+
+export const groupMemberSchema = z.object({
+  userId: z.string().min(1).max(100),
+  role: z.enum(["member", "admin"]).optional(),
+});
+
+export const groupPolicySchema = z.object({
+  policyType: z.enum(["password", "session", "mfa", "sharing"]),
+  policyValue: z.string().min(1),
+  enabled: z.boolean().optional(),
+});
+
+export const groupPolicyUpdateSchema = groupPolicySchema.partial();
+
+// #26 — Approval Workflows
+export const approvalRequestSchema = z.object({
+  action: z.enum(["share", "export", "emergency-access", "admin-action"]),
+  resourceType: z.enum(["secret", "vault", "setting"]),
+  resourceId: z.string().max(100).optional(),
+  reason: z.string().min(1).max(2000),
+});
+
+export const approvalDecisionSchema = z.object({
+  decision: z.enum(["approved", "rejected"]),
+  comment: z.string().max(2000).optional(),
+});
+
+// #27 — Break-Glass
+export const breakGlassSchema = z.object({
+  reason: z.string().min(1).max(2000),
+});
+
+export const breakGlassDecisionSchema = z.object({
+  decision: z.enum(["approved", "denied"]),
+});
+
+// #28 — Webhooks
+export const webhookSchema = z.object({
+  name: z.string().min(1).max(100),
+  url: z.string().url().max(500),
+  secret: z.string().max(500).optional(),
+  events: z.array(z.string().min(1)).min(1),
+  enabled: z.boolean().optional(),
+  retryCount: z.number().int().min(0).max(10).optional(),
+  timeoutMs: z.number().int().min(1000).max(30000).optional(),
+});
+
+export const webhookUpdateSchema = webhookSchema.partial();
+
+// #30 — Compliance Reports
+export const complianceReportSchema = z.object({
+  reportType: z.enum(["soc2", "hipaa", "gdpr", "custom", "admin-audit"]),
+  periodStart: z.string().datetime(),
+  periodEnd: z.string().datetime(),
+  parameters: z.string().max(10_000).optional(),
+});
