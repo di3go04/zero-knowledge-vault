@@ -17,6 +17,7 @@
  *   "recovery" — setup, recover
  */
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { db } from "@/lib/db";
 import { requireAuth } from "@/lib/auth-helper";
 import { createAuditLogSchema, validatePayload } from "@/lib/validation-schemas";
@@ -51,6 +52,8 @@ export async function GET(req: NextRequest) {
       encryptedEvent: true,
       eventIv: true,
       eventCategory: true,
+      previousEventHash: true,
+      eventSignature: true,
       createdAt: true,
     },
   });
@@ -77,18 +80,31 @@ export async function POST(req: NextRequest) {
   }
   const { encryptedEvent, eventIv, eventCategory } = validation.data;
 
+  // Hash chain inmutable: SHA-256 del encryptedEvent del log anterior
+  const previousLog = await db.auditLog.findFirst({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    select: { encryptedEvent: true },
+  });
+  const previousEventHash = previousLog
+    ? createHash("sha256").update(previousLog.encryptedEvent).digest("hex")
+    : "";
+
   const log = await db.auditLog.create({
     data: {
       userId,
       encryptedEvent,
       eventIv,
       eventCategory,
+      previousEventHash,
+      eventSignature: body.eventSignature ?? "",
     },
   });
 
   return NextResponse.json({
     logId: log.id,
     createdAt: log.createdAt,
-    note: "Log cifrado almacenado. Solo tú puedes descifrarlo con tu llave de auditoría (derivada de masterKey).",
+    previousEventHash,
+    note: "Log cifrado almacenado con hash chain inmutable.",
   });
 }

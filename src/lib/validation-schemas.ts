@@ -264,6 +264,7 @@ export const createAuditLogSchema = z.object({
   encryptedEvent: aesGcmBlob(28, 64 * 1024),
   eventIv: aesGcmIv,
   eventCategory: z.enum(["auth", "secret", "share", "device", "recovery"]),
+  eventSignature: z.string().max(512).optional(),
 });
 
 // ---------------------------------------------------------------------------

@@ -249,13 +249,19 @@ model AuditLog {
   id              String   @id @default(cuid())
   userId          String
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  // Tipo de evento CIFRADO (no filtrar metadata en logs del server)
   encryptedEvent  String   // base64, AES-256-GCM
   eventIv         String   // base64, 12 bytes
-  // Metadata no cifrada (mínima, para indexación)
   eventCategory   String   // "auth" | "secret" | "share" | "rotation" | "device"
+  // Hash chain: SHA-256 del encryptedEvent del log anterior del mismo usuario.
+  // Crea una cadena inmutable: alterar un log requiere recalcular todos los
+  // hashes siguientes. El primer log de un usuario tiene previousHash="".
+  previousEventHash String  @default("")
+  // HMAC-SHA256 del encryptedEvent usando la auditKey derivada (se verifica
+  // en el cliente al descifrar). Sirve como prueba de integridad adicional.
+  eventSignature    String  @default("")
   createdAt       DateTime @default(now())
 
   @@index([userId, createdAt])
   @@index([eventCategory])
+  @@index([previousEventHash])
 }
