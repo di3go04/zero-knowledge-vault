@@ -120,10 +120,14 @@ const memoryStore = {
 // Políticas predefinidas
 // ---------------------------------------------------------------------------
 export const RATE_LIMIT_POLICIES = {
-  login: { maxAttempts: 5, windowMs: 15 * 60 * 1000 }, // 5 / 15 min
-  enrollVerify: { maxAttempts: 5, windowMs: 60 * 1000 }, // 5 / 1 min
-  enrollLookup: { maxAttempts: 5, windowMs: 60 * 1000 }, // 5 / 1 min
-  enrollInit: { maxAttempts: 3, windowMs: 5 * 60 * 1000 }, // 3 / 5 min
+  login: { maxAttempts: 5, windowMs: 15 * 60 * 1000 },
+  enrollVerify: { maxAttempts: 5, windowMs: 60 * 1000 },
+  enrollLookup: { maxAttempts: 5, windowMs: 60 * 1000 },
+  enrollInit: { maxAttempts: 3, windowMs: 5 * 60 * 1000 },
+  secretCreate: { maxAttempts: 30, windowMs: 60 * 1000 },
+  shareCreate: { maxAttempts: 20, windowMs: 60 * 1000 },
+  apiKeyCreate: { maxAttempts: 10, windowMs: 60 * 1000 },
+  emergencyClaim: { maxAttempts: 5, windowMs: 60 * 1000 },
   default: { maxAttempts: 5, windowMs: 15 * 60 * 1000 },
 } as const;
 
@@ -150,10 +154,20 @@ function cleanupOldEntries(windowMs: number) {
 }
 
 /**
+ * Penaliza a un usuario después de múltiples violaciones.
+ * Los endpoints sensibles (login, verify) aumentan su ventana
+ * progresivamente: 15min → 30min → 1h → 2h → 4h.
+ */
+function getAdaptiveWindow(baseWindowMs: number, violationCount: number): number {
+  if (violationCount <= 1) return baseWindowMs;
+  const multiplier = Math.min(Math.pow(2, violationCount - 1), 16);
+  return baseWindowMs * multiplier;
+}
+
+/**
  * Verifica si una acción está permitida bajo el rate limit.
- * Registra el intento actual (siempre, incluso si es denegado).
- *
- * ASYNC: usa el store (Redis o Map) que puede requerir I/O.
+ * Implementa rate limiting adaptativo: si un usuario/IP acumula
+ * múltiples violaciones, la ventana de tiempo aumenta exponencialmente.
  */
 export async function checkRateLimit(
   key: string,
@@ -164,15 +178,24 @@ export async function checkRateLimit(
 
   const store = await getStore();
   const now = Date.now();
-  const cutoff = now - windowMs;
 
-  // Obtener intentos existentes
+  // Obtener contador de violaciones para rate adaptativo
+  const violationKey = `violations:${key}`;
+  const violationStr = await store.get(violationKey).then((a) => a?.[0] ?? null);
+  const violationCount = violationStr ? Math.floor((now - violationStr) / windowMs) + 1 : 0;
+  const adaptiveWindow = getAdaptiveWindow(windowMs, violationCount);
+  const cutoff = now - adaptiveWindow;
+
   let attempts = (await store.get(key)) ?? [];
   attempts = attempts.filter((t) => t > cutoff);
 
   if (attempts.length >= maxAttempts) {
     const oldest = Math.min(...attempts);
-    const retryAfterMs = oldest + windowMs - now;
+    const retryAfterMs = oldest + adaptiveWindow - now;
+
+    // Registrar violación
+    await store.set(violationKey, [now], adaptiveWindow);
+
     return {
       allowed: false,
       remaining: 0,
@@ -180,9 +203,8 @@ export async function checkRateLimit(
     };
   }
 
-  // Registrar el intento actual
   attempts.push(now);
-  await store.set(key, attempts, windowMs);
+  await store.set(key, attempts, adaptiveWindow);
 
   return {
     allowed: true,
