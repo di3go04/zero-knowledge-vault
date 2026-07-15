@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAuth } from "@/lib/auth-helper";
-import { rolePermissionOverrideSchema, validatePayload } from "@/lib/validation-schemas";
+import { roleScopeSchema, validatePayload } from "@/lib/validation-schemas";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth(req);
@@ -13,9 +13,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "Role not found" }, { status: 404 });
   }
 
-  const overrides = await db.rolePermissionOverride.findMany({ where: { roleId: id } });
+  const scopes = await db.roleScope.findMany({ where: { roleId: id } });
 
-  return NextResponse.json({ overrides });
+  return NextResponse.json({ scopes });
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -35,14 +35,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const validation = validatePayload(rolePermissionOverrideSchema, body);
+  const validation = validatePayload(roleScopeSchema, body);
   if (!validation.success) {
     return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
-  const override = await db.rolePermissionOverride.create({
+  const scope = await db.roleScope.create({
     data: { ...validation.data, roleId: id },
   });
 
-  return NextResponse.json(override, { status: 201 });
+  return NextResponse.json(scope, { status: 201 });
 }

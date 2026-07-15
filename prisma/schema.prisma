@@ -25,22 +25,24 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  keyMaterial         UserKeyMaterial?
-  ownedSecrets        Secret[]
-  secretKeyShares     SecretKeyShare[]
-  devices             Device[]
-  auditLogs           AuditLog[]
-  webAuthnCredentials     WebAuthnCredential[]
-  emergencyGrants         EmergencyAccess[]   @relation("EmergencyGrantor")
-  emergencyBeneficiaries  EmergencyAccess[]   @relation("EmergencyBeneficiary")
-  scimUser                ScimUser?
-  userRoles               UserRole[]
-  groupMemberships        GroupMember[]
-  approvalRequests        ApprovalRequest[]   @relation("ApprovalRequester")
-  approvalApprovals       ApprovalRequest[]   @relation("ApprovalApprover")
-  breakGlassAccesses      BreakGlassAccess[]  @relation("BreakGlassRequester")
-  breakGlassApprovals     BreakGlassAccess[]  @relation("BreakGlassApprover")
-  complianceReports       ComplianceReport[]
+  keyMaterial            UserKeyMaterial?
+  ownedSecrets           Secret[]
+  secretKeyShares        SecretKeyShare[]
+  devices                Device[]
+  auditLogs              AuditLog[]
+  webAuthnCredentials    WebAuthnCredential[]
+  emergencyGrants        EmergencyAccess[]    @relation("EmergencyGrantor")
+  emergencyBeneficiaries EmergencyAccess[]    @relation("EmergencyBeneficiary")
+  scimUser               ScimUser?
+  userRoles              UserRole[]
+  groupMemberships       GroupMember[]
+  approvalRequests       ApprovalRequest[]    @relation("ApprovalRequester")
+  approvalApprovals      ApprovalRequest[]    @relation("ApprovalApprover")
+  breakGlassAccesses     BreakGlassAccess[]   @relation("BreakGlassRequester")
+  breakGlassApprovals    BreakGlassAccess[]   @relation("BreakGlassApprover")
+  complianceReports      ComplianceReport[]
+  eDiscoveryExports      EDiscoveryExport[]
+  actionTokens           UserActionToken[]
 }
 
 // ---------------------------------------------------------------------
@@ -63,33 +65,33 @@ model User {
 // ECDH (que solo existe en los dos dispositivos).
 // ---------------------------------------------------------------------
 model Device {
-  id                            String   @id @default(cuid())
-  userId                        String
-  user                          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  deviceName                    String
+  id                         String    @id @default(cuid())
+  userId                     String
+  user                       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceName                 String
   // Llave pública ECDH P-256 del dispositivo NUEVO (B) — JWK, en claro
-  publicKeyECDH                 String   // JSON
-  publicKeyECDHFingerprint      String   // hex SHA-256 del JWK canonizado
+  publicKeyECDH              String // JSON
+  publicKeyECDHFingerprint   String // hex SHA-256 del JWK canonizado
   // Post-Quantum: Llave pública Kyber ML-KEM 768 del dispositivo B (base64)
-  publicKeyKyber                String?  // base64, null si no soporta PQ
+  publicKeyKyber             String? // base64, null si no soporta PQ
   // Ciphertext Kyber generado por dispositivo A para que B pueda decapsular
-  kyberCiphertext               String?  // base64, null hasta que A completa
+  kyberCiphertext            String? // base64, null hasta que A completa
   // Llave pública ECDH P-256 EFÍMERA del dispositivo AUTORIZADOR (A) — JWK
   // Se guarda cuando A completa el enrollment, para que B pueda derivar
   // el shared secret ECDH y desenvolver la wrappedPrivateKey.
-  enrollerPublicKeyECDH         String?  // JSON, null hasta que A completa
+  enrollerPublicKeyECDH      String? // JSON, null hasta que A completa
   // PrivateKey RSA del usuario, envuelta con la llave simétrica derivada
   // vía ECDH entre este dispositivo y el dispositivo que lo autorizó.
   // Si el envío es híbrido, la llave AES deriva de ECDH + Kyber combinados.
-  wrappedPrivateKeyForDevice    String   // base64, AES-256-GCM
-  wrappedPrivateKeyIv           String   // base64, 12 bytes
+  wrappedPrivateKeyForDevice String // base64, AES-256-GCM
+  wrappedPrivateKeyIv        String // base64, 12 bytes
   // Algoritmo usado: "ecdh" (clásico) o "hybrid-ecdh-kyber768" (post-quántico)
-  keyExchangeAlgorithm          String   @default("hybrid-ecdh-kyber768")
-  enrollCode                    String?  // código de 6 dígitos (solo durante enrollment)
-  enrollCodeExpiresAt           DateTime?
-  enrolledAt                    DateTime @default(now())
-  lastSeenAt                    DateTime @default(now())
-  revokedAt                     DateTime? // null = activo
+  keyExchangeAlgorithm       String    @default("hybrid-ecdh-kyber768")
+  enrollCode                 String? // código de 6 dígitos (solo durante enrollment)
+  enrollCodeExpiresAt        DateTime?
+  enrolledAt                 DateTime  @default(now())
+  lastSeenAt                 DateTime  @default(now())
+  revokedAt                  DateTime? // null = activo
 
   @@index([userId])
   @@index([enrollCode])
@@ -106,21 +108,21 @@ model Device {
 // - privateKeyIv: IV en claro (base64) usado para cifrar la llave privada.
 // ---------------------------------------------------------------------
 model UserKeyMaterial {
-  id                     String   @id @default(cuid())
-  userId                 String   @unique
-  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                     String @id @default(cuid())
+  userId                 String @unique
+  user                   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   // KDF — Argon2id (preferido) o PBKDF2 (legacy)
-  kdfAlgorithm           String   @default("argon2id") // "argon2id" | "pbkdf2"
-  kdfSalt                String   // base64, público
-  kdfIterations          Int      // Argon2id: t (time). PBKDF2: iteraciones.
-  kdfMemoryKiB           Int?     // Argon2id: m (memory). PBKDF2: null.
-  kdfParallelism         Int?     // Argon2id: p (parallelism). PBKDF2: null.
-  publicKeyJwk           String   // JSON string, público
-  publicKeyFingerprint   String   // hex SHA-256 del JWK canonizado — para TOFU y detección de sustitución
-  popSignature           String   // base64 — firma RSA-PSS de {email, publicKeyFingerprint, kdfSalt} con la privateKey
-  popSignatureHash       String   // "SHA-256" — algoritmo usado para la firma PoP (auditabilidad)
-  encryptedPrivateKeyJwk String   // base64, AES-256-GCM ciphertext con masterKey
-  privateKeyIv           String   // base64, público
+  kdfAlgorithm           String @default("argon2id") // "argon2id" | "pbkdf2"
+  kdfSalt                String // base64, público
+  kdfIterations          Int // Argon2id: t (time). PBKDF2: iteraciones.
+  kdfMemoryKiB           Int? // Argon2id: m (memory). PBKDF2: null.
+  kdfParallelism         Int? // Argon2id: p (parallelism). PBKDF2: null.
+  publicKeyJwk           String // JSON string, público
+  publicKeyFingerprint   String // hex SHA-256 del JWK canonizado — para TOFU y detección de sustitución
+  popSignature           String // base64 — firma RSA-PSS de {email, publicKeyFingerprint, kdfSalt} con la privateKey
+  popSignatureHash       String // "SHA-256" — algoritmo usado para la firma PoP (auditabilidad)
+  encryptedPrivateKeyJwk String // base64, AES-256-GCM ciphertext con masterKey
+  privateKeyIv           String // base64, público
 
   // Recovery Key (BIP-39) — backup cifrado de la privateKey RSA
   // El usuario recibe 24 palabras en el registro. Estas se derivan a
@@ -128,18 +130,18 @@ model UserKeyMaterial {
   // olvida su contraseña maestra, puede usar la frase de 24 palabras
   // para descifrar este blob y recuperar su cuenta.
   // El servidor NUNCA ve las 24 palabras — solo el blob cifrado.
-  recoverySalt           String?  // base64, salt para derivar recovery key
-  recoveryIterations     Int?     // PBKDF2 iteraciones para recovery key (puede ser alto, no bloquea UI)
+  recoverySalt                   String? // base64, salt para derivar recovery key
+  recoveryIterations             Int? // PBKDF2 iteraciones para recovery key (puede ser alto, no bloquea UI)
   encryptedPrivateKeyForRecovery String? // base64, AES-256-GCM con recovery key
-  recoveryIv             String?  // base64, 12 bytes
-  recoveryEnabled        Boolean  @default(false)
+  recoveryIv                     String? // base64, 12 bytes
+  recoveryEnabled                Boolean @default(false)
 
   // Master key rotation: cada 30 días el usuario debe rotar su contraseña
   // maestra para limitar el daño si una masterKey fue comprometida.
-  lastKeyRotationAt      DateTime @default(now())
+  lastKeyRotationAt DateTime @default(now())
 
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([publicKeyFingerprint])
 }
@@ -159,19 +161,19 @@ model UserKeyMaterial {
 //      o el wrappedPrivateKey de un dispositivo.
 // ---------------------------------------------------------------------
 model EmergencyAccess {
-  id              String   @id @default(cuid())
-  grantorId       String
-  grantor         User     @relation("EmergencyGrantor", fields: [grantorId], references: [id], onDelete: Cascade)
-  beneficiaryId   String
-  beneficiary     User     @relation("EmergencyBeneficiary", fields: [beneficiaryId], references: [id], onDelete: Cascade)
-  message         String?  // Mensaje del grantor al beneficiary
-  delayHours      Int      @default(72) // 72h por defecto
+  id            String    @id @default(cuid())
+  grantorId     String
+  grantor       User      @relation("EmergencyGrantor", fields: [grantorId], references: [id], onDelete: Cascade)
+  beneficiaryId String
+  beneficiary   User      @relation("EmergencyBeneficiary", fields: [beneficiaryId], references: [id], onDelete: Cascade)
+  message       String? // Mensaje del grantor al beneficiary
+  delayHours    Int       @default(72) // 72h por defecto
   // Estados: "pending" → "active" (time-lock started) → "approved" (reclamado) → "cancelled"
-  status          String   @default("pending") // pending | active | cancelled | completed
-  claimedAt       DateTime? // Cuando el beneficiary inició el reclamo
-  completedAt     DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  status        String    @default("pending") // pending | active | cancelled | completed
+  claimedAt     DateTime? // Cuando el beneficiary inició el reclamo
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@unique([grantorId, beneficiaryId])
   @@index([beneficiaryId])
@@ -181,21 +183,21 @@ model EmergencyAccess {
 // Password Policies — configurables por organización
 // ---------------------------------------------------------------------
 model PasswordPolicy {
-  id              String   @id @default(cuid())
-  name            String   @default("default")
-  minLength       Int      @default(12)
-  maxLength       Int      @default(128)
-  requireUppercase Boolean @default(true)
-  requireLowercase Boolean @default(true)
-  requireNumbers  Boolean  @default(true)
-  requireSymbols  Boolean  @default(true)
-  expirationDays  Int      @default(90)
-  minUniqueChars  Int      @default(6)
-  historySize     Int      @default(5) // No repetir últimas N contraseñas
-  maxFailedAttempts Int    @default(5)
-  lockoutMinutes  Int      @default(15)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                String   @id @default(cuid())
+  name              String   @default("default")
+  minLength         Int      @default(12)
+  maxLength         Int      @default(128)
+  requireUppercase  Boolean  @default(true)
+  requireLowercase  Boolean  @default(true)
+  requireNumbers    Boolean  @default(true)
+  requireSymbols    Boolean  @default(true)
+  expirationDays    Int      @default(90)
+  minUniqueChars    Int      @default(6)
+  historySize       Int      @default(5) // No repetir últimas N contraseñas
+  maxFailedAttempts Int      @default(5)
+  lockoutMinutes    Int      @default(15)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 // ---------------------------------------------------------------------
@@ -207,17 +209,17 @@ model PasswordPolicy {
 // método de login sin contraseña.
 // ---------------------------------------------------------------------
 model WebAuthnCredential {
-  id              String   @id
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  credentialId    String   @unique
-  publicKey       String   // base64, llave pública cose
-  counter         BigInt  @default(0)
-  transports      String   // JSON array: ["usb", "nfc", "ble", "internal"]
-  deviceName      String?  // Etiqueta: "YubiKey 5C NFC", "iPhone Passkey"
-  credentialType  String   @default("platform") // "platform" = passkey, "cross-platform" = YubiKey
-  createdAt       DateTime @default(now())
-  lastUsedAt      DateTime @default(now())
+  id             String   @id
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialId   String   @unique
+  publicKey      String // base64, llave pública cose
+  counter        BigInt   @default(0)
+  transports     String // JSON array: ["usb", "nfc", "ble", "internal"]
+  deviceName     String? // Etiqueta: "YubiKey 5C NFC", "iPhone Passkey"
+  credentialType String   @default("platform") // "platform" = passkey, "cross-platform" = YubiKey
+  createdAt      DateTime @default(now())
+  lastUsedAt     DateTime @default(now())
 
   @@index([userId])
 }
@@ -229,18 +231,18 @@ model WebAuthnCredential {
 // - El servidor no conoce ni el título ni el contenido.
 // ---------------------------------------------------------------------
 model Secret {
-  id             String   @id @default(cuid())
-  ownerId        String
-  owner          User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  encryptedTitle String   // base64, AES-256-GCM
-  titleIv        String   // base64
-  encryptedData  String   // base64, AES-256-GCM
-  dataIv         String   // base64
+  id                String   @id @default(cuid())
+  ownerId           String
+  owner             User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  encryptedTitle    String // base64, AES-256-GCM
+  titleIv           String // base64
+  encryptedData     String // base64, AES-256-GCM
+  dataIv            String // base64
   encryptedMetadata String? // base64, AES-256-GCM — tags, URLs, notes cifrados
-  metadataIv     String?  // base64
-  secretType     String   @default("password") // password | note | ssh-key | api-key | certificate | database
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  metadataIv        String? // base64
+  secretType        String   @default("password") // password | note | ssh-key | api-key | certificate | database
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   keyShares SecretKeyShare[]
 }
@@ -258,7 +260,7 @@ model SecretKeyShare {
   secret              Secret   @relation(fields: [secretId], references: [id], onDelete: Cascade)
   recipientId         String
   recipient           User     @relation(fields: [recipientId], references: [id], onDelete: Cascade)
-  wrappedSymmetricKey String   // base64, RSA-OAEP(AES key)
+  wrappedSymmetricKey String // base64, RSA-OAEP(AES key)
   createdAt           DateTime @default(now())
 
   @@unique([secretId, recipientId])
@@ -278,20 +280,20 @@ model SecretKeyShare {
 // históricos. Se deriva como HKDF(masterKey, "audit-log-v1").
 // ---------------------------------------------------------------------
 model AuditLog {
-  id              String   @id @default(cuid())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  encryptedEvent  String   // base64, AES-256-GCM
-  eventIv         String   // base64, 12 bytes
-  eventCategory   String   // "auth" | "secret" | "share" | "rotation" | "device"
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  encryptedEvent    String // base64, AES-256-GCM
+  eventIv           String // base64, 12 bytes
+  eventCategory     String // "auth" | "secret" | "share" | "rotation" | "device"
   // Hash chain: SHA-256 del encryptedEvent del log anterior del mismo usuario.
   // Crea una cadena inmutable: alterar un log requiere recalcular todos los
   // hashes siguientes. El primer log de un usuario tiene previousHash="".
-  previousEventHash String  @default("")
+  previousEventHash String   @default("")
   // HMAC-SHA256 del encryptedEvent usando la auditKey derivada (se verifica
   // en el cliente al descifrar). Sirve como prueba de integridad adicional.
-  eventSignature    String  @default("")
-  createdAt       DateTime @default(now())
+  eventSignature    String   @default("")
+  createdAt         DateTime @default(now())
 
   @@index([userId, createdAt])
   @@index([eventCategory])
@@ -304,14 +306,14 @@ model AuditLog {
 
 // #21 — SCIM 2.0 Provisioning
 model ScimUser {
-  id              String   @id @default(cuid())
-  userId          String   @unique
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  externalId      String   @unique
-  userName        String   @unique
-  active          Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  externalId String   @unique
+  userName   String   @unique
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@index([externalId])
   @@index([userName])
@@ -319,71 +321,73 @@ model ScimUser {
 
 // #22 — SAML 2.0 / OIDC SSO Provider
 model SsoProvider {
-  id              String   @id @default(cuid())
-  providerType    String   // "saml" | "oidc"
-  providerName    String   @unique
-  issuerUrl       String
-  clientId        String?
-  clientSecret    String?
-  metadataUrl     String?
-  metadataXml     String?
+  id               String   @id @default(cuid())
+  providerType     String // "saml" | "oidc"
+  providerName     String   @unique
+  issuerUrl        String
+  clientId         String?
+  clientSecret     String?
+  metadataUrl      String?
+  metadataXml      String?
   attributeMapping String? // JSON
-  enabled         Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  enabled          Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
 // #23 — LDAP / Active Directory Connector
 model DirectoryConnector {
-  id                String   @id @default(cuid())
-  name              String   @unique
-  providerType      String   // "ldap" | "active-directory"
+  id                String    @id @default(cuid())
+  name              String    @unique
+  providerType      String // "ldap" | "active-directory"
   url               String
   baseDn            String
   bindDn            String
-  bindPassword      String   // encrypted at rest
-  userSearchFilter  String   @default("(objectClass=person)")
-  groupSearchFilter String   @default("(objectClass=group)")
-  syncIntervalSec   Int      @default(3600)
-  enabled           Boolean  @default(true)
+  bindPassword      String // encrypted at rest
+  userSearchFilter  String    @default("(objectClass=person)")
+  groupSearchFilter String    @default("(objectClass=group)")
+  syncIntervalSec   Int       @default(3600)
+  enabled           Boolean   @default(true)
   lastSyncAt        DateTime?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }
 
 // #24 — RBAC Granular
 model Role {
-  id              String   @id @default(cuid())
-  name            String   @unique
-  description     String?
-  isSystem        Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  permissions     Permission[]
-  userRoles       UserRole[]
+  permissions         Permission[]
+  userRoles           UserRole[]
+  scopes              RoleScope[]
+  permissionOverrides RolePermissionOverride[]
 }
 
 model Permission {
-  id              String   @id @default(cuid())
-  roleId          String
-  role            Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  action          String
-  resource        String
-  conditions      String?  // JSON — future ABAC conditions
-  createdAt       DateTime @default(now())
+  id         String   @id @default(cuid())
+  roleId     String
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  action     String
+  resource   String
+  conditions String? // JSON — future ABAC conditions
+  createdAt  DateTime @default(now())
 
   @@unique([roleId, action, resource])
 }
 
 model UserRole {
-  id              String   @id @default(cuid())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  roleId          String
-  role            Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  assignedBy      String?
-  createdAt       DateTime @default(now())
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId     String
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  assignedBy String?
+  createdAt  DateTime @default(now())
 
   @@unique([userId, roleId])
   @@index([userId])
@@ -392,24 +396,24 @@ model UserRole {
 
 // #25 — Group Policies
 model UserGroup {
-  id              String   @id @default(cuid())
-  name            String   @unique
-  description     String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  members         GroupMember[]
-  policies        GroupPolicy[]
+  members  GroupMember[]
+  policies GroupPolicy[]
 }
 
 model GroupMember {
-  id              String   @id @default(cuid())
-  groupId         String
-  group           UserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role            String   @default("member") // "member" | "admin"
-  createdAt       DateTime @default(now())
+  id        String    @id @default(cuid())
+  groupId   String
+  group     UserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String    @default("member") // "member" | "admin"
+  createdAt DateTime  @default(now())
 
   @@unique([groupId, userId])
   @@index([groupId])
@@ -417,14 +421,14 @@ model GroupMember {
 }
 
 model GroupPolicy {
-  id              String   @id @default(cuid())
-  groupId         String
-  group           UserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  policyType      String   // "password" | "session" | "mfa" | "sharing"
-  policyValue     String   // JSON
-  enabled         Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id          String    @id @default(cuid())
+  groupId     String
+  group       UserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  policyType  String // "password" | "session" | "mfa" | "sharing"
+  policyValue String // JSON
+  enabled     Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@unique([groupId, policyType])
   @@index([groupId])
@@ -432,20 +436,20 @@ model GroupPolicy {
 
 // #26 — Approval Workflows
 model ApprovalRequest {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   requesterId     String
-  requester       User     @relation("ApprovalRequester", fields: [requesterId], references: [id], onDelete: Cascade)
-  action          String   // "share" | "export" | "emergency-access" | "admin-action"
-  resourceType    String   // "secret" | "vault" | "setting"
+  requester       User      @relation("ApprovalRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  action          String // "share" | "export" | "emergency-access" | "admin-action"
+  resourceType    String // "secret" | "vault" | "setting"
   resourceId      String?
   reason          String
-  status          String   @default("pending") // "pending" | "approved" | "rejected" | "cancelled"
+  status          String    @default("pending") // "pending" | "approved" | "rejected" | "cancelled"
   approvedById    String?
-  approvedBy      User?    @relation("ApprovalApprover", fields: [approvedById], references: [id])
+  approvedBy      User?     @relation("ApprovalApprover", fields: [approvedById], references: [id])
   approverComment String?
   expiresAt       DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([requesterId])
   @@index([status])
@@ -453,18 +457,18 @@ model ApprovalRequest {
 
 // #27 — Dual Control / Break-Glass
 model BreakGlassAccess {
-  id              String   @id @default(cuid())
-  userId          String
-  user            User     @relation("BreakGlassRequester", fields: [userId], references: [id], onDelete: Cascade)
-  reason          String
-  status          String   @default("pending") // "pending" | "approved" | "denied" | "expired"
-  approverId      String?
-  approver        User?    @relation("BreakGlassApprover", fields: [approverId], references: [id])
-  approvedAt      DateTime?
-  expiresAt       DateTime?
-  accessToken     String?  // HMAC token temporal
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation("BreakGlassRequester", fields: [userId], references: [id], onDelete: Cascade)
+  reason      String
+  status      String    @default("pending") // "pending" | "approved" | "denied" | "expired"
+  approverId  String?
+  approver    User?     @relation("BreakGlassApprover", fields: [approverId], references: [id])
+  approvedAt  DateTime?
+  expiresAt   DateTime?
+  accessToken String? // HMAC token temporal
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([userId])
   @@index([status])
@@ -472,33 +476,262 @@ model BreakGlassAccess {
 
 // #28 — Webhooks for SIEM
 model WebhookConfig {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   name            String
   url             String
-  secret          String?  // HMAC secret for payload signing
-  events          String   // JSON array — ["auth:login", "secret:read", ...]
-  enabled         Boolean  @default(true)
-  retryCount      Int      @default(3)
-  timeoutMs       Int      @default(5000)
+  secret          String? // HMAC secret for payload signing
+  events          String // JSON array — ["auth:login", "secret:read", ...]
+  enabled         Boolean   @default(true)
+  retryCount      Int       @default(3)
+  timeoutMs       Int       @default(5000)
   lastTriggeredAt DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }
 
 // #30 — Compliance Reports
 model ComplianceReport {
-  id              String   @id @default(cuid())
-  reportType      String   // "soc2" | "hipaa" | "gdpr" | "custom" | "admin-audit"
-  periodStart     DateTime
-  periodEnd       DateTime
-  status          String   @default("pending") // "pending" | "generating" | "completed" | "failed"
-  parameters      String?  // JSON
-  resultData      String?  // JSON
-  generatedById   String?
-  generatedBy     User?    @relation(fields: [generatedById], references: [id])
-  createdAt       DateTime @default(now())
-  completedAt     DateTime?
+  id            String    @id @default(cuid())
+  reportType    String // "soc2" | "hipaa" | "gdpr" | "custom" | "admin-audit"
+  periodStart   DateTime
+  periodEnd     DateTime
+  status        String    @default("pending") // "pending" | "generating" | "completed" | "failed"
+  parameters    String? // JSON
+  resultData    String? // JSON
+  generatedById String?
+  generatedBy   User?     @relation(fields: [generatedById], references: [id])
+  createdAt     DateTime  @default(now())
+  completedAt   DateTime?
 
   @@index([reportType])
   @@index([status])
+}
+
+// =====================================================================
+// Enterprise Feature Models (#31–#40)
+// =====================================================================
+
+// #31 — eDiscovery / Forensic Export
+model EDiscoveryExport {
+  id            String    @id @default(cuid())
+  requestedById String
+  targetUserId  String
+  requestedBy   User      @relation(fields: [requestedById], references: [id])
+  reason        String
+  dataTypes     String // JSON array
+  status        String    @default("pending") // "pending" | "completed" | "failed"
+  exportData    String? // JSON
+  expiresAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([targetUserId])
+  @@index([requestedById])
+  @@index([status])
+}
+
+// #32 — DLP (Data Loss Prevention)
+model DlpRule {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  pattern      String
+  action       String // "block" | "alert" | "mask" | "audit"
+  resourceType String   @default("all") // "secret" | "note" | "all"
+  severity     String   @default("medium") // "low" | "medium" | "high" | "critical"
+  enabled      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  scanResults DlpScanResult[]
+}
+
+model DlpScanResult {
+  id              String   @id @default(cuid())
+  ruleId          String
+  rule            DlpRule  @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  resourceType    String
+  resourceId      String
+  detectedContent String?
+  action          String
+  resolved        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  @@index([ruleId])
+  @@index([resourceType, resourceId])
+}
+
+// #33 — Retention Policies
+model RetentionPolicy {
+  id            String   @id @default(cuid())
+  name          String
+  description   String?
+  resourceType  String // "audit-log" | "secret" | "session" | "export"
+  retentionDays Int
+  action        String   @default("delete") // "delete" | "archive" | "anonymize"
+  enabled       Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// #34 — Custom Roles (extending #24 RBAC)
+model RoleScope {
+  id         String   @id @default(cuid())
+  roleId     String
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  scopeType  String // "global" | "group" | "vault"
+  scopeValue String?
+  createdAt  DateTime @default(now())
+
+  @@unique([roleId, scopeType, scopeValue])
+  @@index([roleId])
+}
+
+model RolePermissionOverride {
+  id            String   @id @default(cuid())
+  roleId        String
+  role          Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionKey String // "admin-panel" | "export" | "manage-users" | "manage-policies"
+  granted       Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  @@unique([roleId, permissionKey])
+  @@index([roleId])
+}
+
+// #35 — Directory Sync (cloud directories)
+model DirectorySyncConfig {
+  id              String    @id @default(cuid())
+  provider        String // "azure-ad" | "google-workspace" | "okta" | "onelogin"
+  name            String
+  clientId        String
+  clientSecret    String
+  tenantId        String?
+  domain          String?
+  syncIntervalSec Int       @default(3600)
+  enabled         Boolean   @default(true)
+  lastSyncAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  syncLogs DirectorySyncLog[]
+}
+
+model DirectorySyncLog {
+  id               String              @id @default(cuid())
+  configId         String
+  config           DirectorySyncConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  status           String // "success" | "partial" | "failed"
+  usersCreated     Int                 @default(0)
+  usersUpdated     Int                 @default(0)
+  usersDeactivated Int                 @default(0)
+  groupsSynced     Int                 @default(0)
+  errorMessage     String?
+  startedAt        DateTime
+  completedAt      DateTime?
+  createdAt        DateTime            @default(now())
+
+  @@index([configId])
+  @@index([status])
+}
+
+// #36 — SLA Monitoring
+model UptimeMonitor {
+  id             String   @id @default(cuid())
+  name           String
+  endpoint       String
+  method         String   @default("GET")
+  expectedStatus Int      @default(200)
+  intervalSec    Int      @default(300)
+  timeoutMs      Int      @default(10000)
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  healthChecks HealthCheckLog[]
+}
+
+model HealthCheckLog {
+  id             String        @id @default(cuid())
+  monitorId      String
+  monitor        UptimeMonitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  status         String // "up" | "down" | "degraded"
+  statusCode     Int?
+  responseTimeMs Int?
+  errorMessage   String?
+  checkedAt      DateTime      @default(now())
+
+  @@index([monitorId, checkedAt])
+  @@index([status])
+}
+
+// #37 — Multitenant
+model Tenant {
+  id         String   @id @default(cuid())
+  name       String
+  slug       String   @unique
+  domain     String?  @unique
+  plan       String   @default("enterprise") // "starter" | "business" | "enterprise"
+  status     String   @default("active") // "active" | "suspended" | "cancelled"
+  maxUsers   Int      @default(100)
+  maxSecrets Int      @default(1000)
+  features   String? // JSON — feature flags
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  branding TenantBranding?
+}
+
+// #38 — Tenant Branding
+model TenantBranding {
+  id             String   @id @default(cuid())
+  tenantId       String   @unique
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  logoUrl        String?
+  faviconUrl     String?
+  primaryColor   String   @default("#2563eb")
+  secondaryColor String?  @default("#1e40af")
+  accentColor    String?  @default("#10b981")
+  companyName    String?
+  supportUrl     String?
+  supportEmail   String?
+  customCss      String?
+  loginMessage   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// #39 — Admin API Keys
+model ApiKey {
+  id          String    @id @default(cuid())
+  name        String
+  keyPrefix   String
+  keyHash     String    @unique
+  permissions String // JSON array
+  createdById String?
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  enabled     Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([keyPrefix])
+}
+
+// #40 — Self-Service Portal / User Action Tokens
+model UserActionToken {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  action    String // "email-verify" | "password-reset" | "device-approve" | "recovery-enable" | "account-recover"
+  payload   String? // JSON
+  status    String    @default("pending") // "pending" | "used" | "expired" | "revoked"
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@index([userId, action])
+  @@index([token])
+  @@index([status, expiresAt])
 }

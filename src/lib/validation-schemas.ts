@@ -538,3 +538,132 @@ export const complianceReportSchema = z.object({
   periodEnd: z.string().datetime(),
   parameters: z.string().max(10_000).optional(),
 });
+
+// ---------------------------------------------------------------------------
+// Enterprise Feature Schemas (#31–#40)
+// ---------------------------------------------------------------------------
+
+// #31 — eDiscovery
+export const eDiscoverySearchSchema = z.object({
+  targetEmail: z.string().email().optional(),
+  targetUserId: z.string().max(100).optional(),
+  reason: z.string().min(1).max(2000),
+  dataTypes: z.array(z.enum(["audit-logs", "secrets", "devices", "shares", "user-profile", "sessions"])).min(1),
+});
+
+// #32 — DLP
+export const dlpRuleSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+  pattern: z.string().min(1).max(2000),
+  action: z.enum(["block", "alert", "mask", "audit"]),
+  resourceType: z.enum(["secret", "note", "all"]).optional(),
+  severity: z.enum(["low", "medium", "high", "critical"]).optional(),
+  enabled: z.boolean().optional(),
+});
+
+export const dlpRuleUpdateSchema = dlpRuleSchema.partial();
+
+// #33 — Retention Policies
+export const retentionPolicySchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+  resourceType: z.enum(["audit-log", "secret", "session", "export"]),
+  retentionDays: z.number().int().min(1).max(36500),
+  action: z.enum(["delete", "archive", "anonymize"]).optional(),
+  enabled: z.boolean().optional(),
+});
+
+export const retentionPolicyUpdateSchema = retentionPolicySchema.partial();
+
+// #34 — Custom Roles (extending #24)
+export const roleScopeSchema = z.object({
+  scopeType: z.enum(["global", "group", "vault"]),
+  scopeValue: z.string().max(100).optional(),
+});
+
+export const rolePermissionOverrideSchema = z.object({
+  permissionKey: z.string().min(1).max(100),
+  granted: z.boolean().optional(),
+});
+
+// #35 — Directory Sync
+export const directorySyncConfigSchema = z.object({
+  provider: z.enum(["azure-ad", "google-workspace", "okta", "onelogin"]),
+  name: z.string().min(1).max(100),
+  clientId: z.string().min(1).max(500),
+  clientSecret: z.string().min(1).max(2000),
+  tenantId: z.string().max(500).optional(),
+  domain: z.string().max(500).optional(),
+  syncIntervalSec: z.number().int().min(60).max(86400).optional(),
+  enabled: z.boolean().optional(),
+});
+
+export const directorySyncConfigUpdateSchema = directorySyncConfigSchema.partial();
+
+// #36 — SLA Monitoring
+export const slaMonitorSchema = z.object({
+  name: z.string().min(1).max(100),
+  endpoint: z.string().url().max(500),
+  method: z.enum(["GET", "POST", "HEAD"]).optional(),
+  expectedStatus: z.number().int().min(100).max(599).optional(),
+  intervalSec: z.number().int().min(30).max(86400).optional(),
+  timeoutMs: z.number().int().min(1000).max(60000).optional(),
+  enabled: z.boolean().optional(),
+});
+
+export const slaMonitorUpdateSchema = slaMonitorSchema.partial();
+
+// #37 — Multitenant
+export const tenantSchema = z.object({
+  name: z.string().min(1).max(200),
+  slug: z.string().min(2).max(100).regex(/^[a-z0-9-]+$/, "slug must be lowercase alphanumeric with hyphens"),
+  domain: z.string().max(500).optional(),
+  plan: z.enum(["starter", "business", "enterprise"]).optional(),
+  status: z.enum(["active", "suspended", "cancelled"]).optional(),
+  maxUsers: z.number().int().min(1).max(100000).optional(),
+  maxSecrets: z.number().int().min(1).max(1000000).optional(),
+  features: z.string().max(10000).optional(),
+});
+
+export const tenantUpdateSchema = tenantSchema.partial();
+
+// #38 — Tenant Branding
+export const tenantBrandingSchema = z.object({
+  logoUrl: z.string().url().max(500).optional(),
+  faviconUrl: z.string().url().max(500).optional(),
+  primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, "must be hex color").optional(),
+  secondaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, "must be hex color").optional(),
+  accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, "must be hex color").optional(),
+  companyName: z.string().max(200).optional(),
+  supportUrl: z.string().url().max(500).optional(),
+  supportEmail: z.string().email().optional(),
+  customCss: z.string().max(50000).optional(),
+  loginMessage: z.string().max(500).optional(),
+});
+
+// #39 — Admin API Keys
+export const apiKeySchema = z.object({
+  name: z.string().min(1).max(100),
+  permissions: z.array(z.string().min(1)).min(1),
+  expiresAt: z.string().datetime().optional(),
+});
+
+export const apiKeyUpdateSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  permissions: z.array(z.string().min(1)).min(1).optional(),
+  enabled: z.boolean().optional(),
+  expiresAt: z.string().datetime().optional(),
+});
+
+// #40 — Self-Service Portal / User Action Tokens
+export const userActionTokenSchema = z.object({
+  userId: z.string().min(1).max(100),
+  action: z.enum(["email-verify", "password-reset", "device-approve", "recovery-enable", "account-recover"]),
+  payload: z.string().max(5000).optional(),
+  expiresInHours: z.number().int().min(1).max(720).default(24),
+});
+
+export const verifyActionTokenSchema = z.object({
+  token: z.string().min(1).max(500),
+});
