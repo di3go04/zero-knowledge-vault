@@ -355,6 +355,32 @@ export const queryCategorySchema = z.object({
     ),
 });
 
+/** Valida query params de paginación (offset + limit). */
+export const paginationSchema = z.object({
+  offset: z
+    .string()
+    .optional()
+    .refine(
+      (v) => !v || (/^\d+$/.test(v) && parseInt(v, 10) >= 0),
+      "offset debe ser entero >= 0",
+    ),
+  limit: z
+    .string()
+    .optional()
+    .refine(
+      (v) => !v || (/^\d+$/.test(v) && parseInt(v, 10) > 0 && parseInt(v, 10) <= 100),
+      "limit debe ser entero 1-100",
+    ),
+});
+
+export function parsePagination(searchParams: URLSearchParams): { offset: number; limit: number } {
+  const rawOffset = searchParams.get("offset") ?? "0";
+  const rawLimit = searchParams.get("limit") ?? "50";
+  const offset = Math.max(0, parseInt(rawOffset, 10) || 0);
+  const limit = Math.min(100, Math.max(1, parseInt(rawLimit, 10) || 50));
+  return { offset, limit };
+}
+
 /** Valida un path param `id` (cuid). */
 export const pathIdSchema = z
   .string()

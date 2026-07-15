@@ -201,7 +201,13 @@ export async function verifyPopSignature(params: {
  * un error de tag GCM inválido — idéntico al comportamiento cuando
  * un usuario real introduce su contraseña maestra incorrecta.
  */
-const DECOY_HMAC_KEY_ENV = process.env.DECOY_HMAC_KEY || "zk-vault-decoy-static-key-change-me";
+const DECOY_HMAC_KEY_ENV = process.env.DECOY_HMAC_KEY;
+if (!DECOY_HMAC_KEY_ENV) {
+  throw new Error(
+    "DECOY_HMAC_KEY environment variable is required. " +
+    "Generate one with: openssl rand -hex 32",
+  );
+}
 
 function hmacSha256(input: string): Uint8Array {
   // createHmac es sincrono y compatible con todos los runtimes Node.

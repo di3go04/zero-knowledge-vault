@@ -99,6 +99,19 @@ export async function POST(req: NextRequest) {
   }
 
   // -------- CASO 2: usuario inexistente → DECOY --------
+  // Rate limit específico para decoy: evita DoS por generación costosa.
+  const decoyRlKey = `decoy-gen:${ip}:${normalizedEmail}`;
+  const decoyRl = await checkRateLimit(decoyRlKey, 5, 60_000);
+  if (!decoyRl.allowed) {
+    return NextResponse.json(
+      {
+        error: "Demasiados intentos. Intenta más tarde.",
+        retryAfter: decoyRl.retryAfterSeconds,
+      },
+      { status: 429 },
+    );
+  }
+
   // IMPORTANTE: NO reseteamos el rate-limit aquí, para que un atacante
   // que sonda emails inexistentes consuma su cupo de intentos.
   const decoy = generateDecoyLoginResponse(normalizedEmail);

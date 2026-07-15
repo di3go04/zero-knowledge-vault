@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAuth } from "@/lib/auth-helper";
-import { createSecretSchema, validatePayload } from "@/lib/validation-schemas";
+import { createSecretSchema, validatePayload, parsePagination } from "@/lib/validation-schemas";
 
 // ----------------------- GET (list) -----------------------
 export async function GET(req: NextRequest) {
@@ -17,19 +17,28 @@ export async function GET(req: NextRequest) {
   if (!auth.ok) return auth.response;
   const userId = auth.userId;
 
-  const shares = await db.secretKeyShare.findMany({
-    where: { recipientId: userId },
-    include: {
-      secret: {
-        include: {
-          owner: { select: { id: true, email: true, name: true } },
+  const { offset, limit } = parsePagination(req.nextUrl.searchParams);
+
+  const [shares, total] = await Promise.all([
+    db.secretKeyShare.findMany({
+      where: { recipientId: userId },
+      include: {
+        secret: {
+          include: {
+            owner: { select: { id: true, email: true, name: true } },
+          },
         },
       },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+      orderBy: { createdAt: "desc" },
+      skip: offset,
+      take: limit,
+    }),
+    db.secretKeyShare.count({
+      where: { recipientId: userId },
+    }),
+  ]);
 
-  const result = shares.map((s) => ({
+  const secrets = shares.map((s) => ({
     id: s.secret.id,
     ownerId: s.secret.ownerId,
     ownerEmail: s.secret.owner.email,
@@ -44,7 +53,15 @@ export async function GET(req: NextRequest) {
     sharedAt: s.createdAt,
   }));
 
-  return NextResponse.json({ secrets: result });
+  return NextResponse.json({
+    secrets,
+    pagination: {
+      offset,
+      limit,
+      total,
+      hasMore: offset + limit < total,
+    },
+  });
 }
 
 // ----------------------- POST (create) -----------------------

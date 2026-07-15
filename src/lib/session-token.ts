@@ -22,8 +22,13 @@
  */
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
-const SESSION_SECRET =
-  process.env.SESSION_SECRET || "zk-vault-session-secret-change-in-prod-min-32-chars!!";
+const SESSION_SECRET = process.env.SESSION_SECRET;
+if (!SESSION_SECRET || SESSION_SECRET.length < 32) {
+  throw new Error(
+    "SESSION_SECRET environment variable is required (min 32 chars). " +
+    "Generate one with: openssl rand -hex 32",
+  );
+}
 
 const SESSION_TTL_SECONDS = 8 * 60 * 60; // 8 horas
 
@@ -116,11 +121,11 @@ async function getBlacklistAdapter(): Promise<BlacklistAdapter> {
               // También verificar Map in-memory por si hubo fallback
               return memoryHas(jti);
             } catch (err: any) {
-              // Redis caído — fail-open (no bloquear usuario legítimo)
-              // pero verificar Map in-memory por si el jti fue añadido
-              // durante un fallo de Redis.
-              console.warn("[blacklist] Redis has falló, usando Map:", err.message);
-              return memoryHas(jti);
+              // Redis caído — fail-close (denegar por seguridad).
+              // Si Redis no responde, no podemos confirmar que el token
+              // NO fue revocado, así que lo tratamos como revocado.
+              console.warn("[blacklist] Redis has falló, DENEGANDO por seguridad:", err.message);
+              return true;
             }
           },
         };
