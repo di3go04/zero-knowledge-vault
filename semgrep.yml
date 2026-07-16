@@ -1,0 +1,199 @@
+# Semgrep configuration for Zero-Knowledge Vault
+# Runs security SAST rules covering OWASP Top 10, CWE, and crypto misuse.
+# Usage:
+#   semgrep --config=semgrep.yml --json -o semgrep-report.json
+#   semgrep --config=semgrep.yml --error
+
+rules:
+  # ===== Crypto misuse =====
+  - id: zk-vault-no-Math.random-for-crypto
+    patterns:
+      - pattern: Math.random()
+    message: "Math.random() is NOT cryptographically secure. Use crypto.getRandomValues() or crypto.subtle."
+    languages: [typescript, javascript]
+    severity: ERROR
+    paths:
+      include:
+        - "src/lib/crypto*.ts"
+        - "src/app/api/**/*.ts"
+    metadata:
+      cwe: "CWE-338: Use of Cryptographically Weak Pseudo-Random Number Generator (PRNG)"
+
+  - id: zk-vault-no-insecure-random
+    pattern-either:
+      - pattern: crypto.randomBytes(...)
+      - pattern: require("crypto").randomBytes(...)
+    message: "Server-side use of randomBytes is OK; verify it is not used for client-side secrets."
+    languages: [typescript, javascript]
+    severity: INFO
+    metadata:
+      cwe: "CWE-338"
+
+  - id: zk-vault-no-md5-sha1
+    pattern-regex: (createHash\s*\(\s*['"](?:md5|sha1)['"]\s*\))
+    message: "MD5/SHA1 are cryptographically broken. Use SHA-256 or stronger."
+    languages: [typescript, javascript]
+    severity: ERROR
+    metadata:
+      cwe: "CWE-327: Use of a Broken or Risky Cryptographic Algorithm"
+
+  - id: zk-vault-no-weak-aes-mode
+    pattern-regex: (AES-CBC|AES-ECB)
+    message: "AES-CBC/ECB without authenticated encryption is insecure. Use AES-256-GCM."
+    languages: [typescript, javascript]
+    severity: ERROR
+    metadata:
+      cwe: "CWE-327"
+
+  # ===== Secret leakage =====
+  - id: zk-vault-no-hardcoded-secrets
+    pattern-regex: (?:password|secret|api[_-]?key|token)\s*[:=]\s*['"][A-Za-z0-9+/=]{16,}['"]
+    message: "Possible hardcoded secret. Move to environment variables."
+    languages: [typescript, javascript]
+    severity: ERROR
+    paths:
+      exclude:
+        - ".env.example"
+        - "**/*.test.ts"
+        - "**/*.spec.ts"
+    metadata:
+      cwe: "CWE-798: Use of Hard-coded Credentials"
+
+  # ===== SQL injection (Prisma raw queries) =====
+  - id: zk-vault-no-raw-sql-template
+    patterns:
+      - pattern: $PRISMA.$queryRaw`...`
+      - pattern-not: $PRISMA.$queryRaw`$LITERAL`
+    message: "$queryRaw with template interpolation may cause SQL injection. Use $queryRaw with parameters or $executeRaw with explicit args."
+    languages: [typescript, javascript]
+    severity: ERROR
+    metadata:
+      cwe: "CWE-89: SQL Injection"
+
+  # ===== Path traversal =====
+  - id: zk-vault-no-path-traversal
+    pattern-either:
+      - pattern: fs.readFile($USER_INPUT, ...)
+      - pattern: fs.writeFile($USER_INPUT, ...)
+      - pattern: fs.unlink($USER_INPUT, ...)
+    message: "Possible path traversal. Validate user input before filesystem operations."
+    languages: [typescript, javascript]
+    severity: WARN
+    metadata:
+      cwe: "CWE-22: Improper Limitation of a Pathname"
+
+  # ===== Server-side eval / Function =====
+  - id: zk-vault-no-eval
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+    message: "eval / new Function leads to RCE. Never use."
+    languages: [typescript, javascript]
+    severity: ERROR
+    paths:
+      exclude:
+        - "src/lib/memory-zero.ts"
+    metadata:
+      cwe: "CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code"
+
+  # ===== SSRF =====
+  - id: zk-vault-no-ssrf-fetch
+    pattern-either:
+      - pattern: fetch($USER_INPUT, ...)
+      - pattern: axios.get($USER_INPUT, ...)
+    message: "fetch/axios with user-controlled URL may cause SSRF. Validate the host."
+    languages: [typescript, javascript]
+    severity: WARN
+    paths:
+      include:
+        - "src/app/api/**"
+    metadata:
+      cwe: "CWE-918: Server-Side Request Forgery"
+
+  # ===== Prototype pollution =====
+  - id: zk-vault-no-prototype-merge
+    pattern-either:
+      - pattern: Object.assign({}, $USER_INPUT)
+      - pattern: "{ ...$USER_INPUT }"
+    message: "Verify user-controlled spread does not include __proto__ / constructor."
+    languages: [typescript, javascript]
+    severity: INFO
+    metadata:
+      cwe: "CWE-1321: Prototype Pollution"
+
+  # ===== Insecure cookies =====
+  - id: zk-vault-insecure-cookie
+    pattern-regex: (?:document\.cookie\s*=\s*|Set-Cookie:[^\n]*)
+    message: "Verify cookies have Secure, HttpOnly, SameSite=Strict attributes."
+    languages: [typescript, javascript]
+    severity: WARN
+    metadata:
+      cwe: "CWE-614: Sensitive Cookie Without Secure Attribute"
+
+  # ===== Open redirect =====
+  - id: zk-vault-open-redirect
+    pattern-either:
+      - pattern: redirect($USER_INPUT)
+      - pattern: NextResponse.redirect($USER_INPUT)
+    message: "Open redirect: validate redirect URLs against allowlist."
+    languages: [typescript, javascript]
+    severity: WARN
+    paths:
+      include:
+        - "src/app/api/**"
+    metadata:
+      cwe: "CWE-601: URL Redirection to Untrusted Site"
+
+  # ===== CORS wildcard =====
+  - id: zk-vault-cors-wildcard
+    pattern-regex: Access-Control-Allow-Origin['"\s:]*\*
+    message: "CORS wildcard allows all origins. Restrict to known domains in production."
+    languages: [typescript, javascript]
+    severity: WARN
+    metadata:
+      cwe: "CWE-942: Permissive Cross-domain Policy"
+
+  # ===== Logging secrets =====
+  - id: zk-vault-no-log-secret
+    pattern-regex: console\.(log|info|debug)\s*\(\s*[^)]*(?:password|secret|token|key)
+    message: "Do not log secrets. console.error allowed only for error context."
+    languages: [typescript, javascript]
+    severity: ERROR
+    metadata:
+      cwe: "CWE-532: Insertion of Sensitive Information into Log File"
+
+  # ===== Disabled security headers =====
+  - id: zk-vault-disabled-csrf
+    pattern-regex: csrf\s*[:=]\s*(?:false|disabled|off)
+    message: "CSRF protection disabled. Verify this is intentional and documented."
+    languages: [typescript, javascript]
+    severity: WARN
+    metadata:
+      cwe: "CWE-352: Cross-Site Request Forgery"
+
+  # ===== ZK-specific: master key in plaintext memory =====
+  - id: zk-vault-plaintext-master-key
+    pattern-regex: masterKey\s*[:=]\s*['"][A-Za-z0-9+/=]{32,}['"]
+    message: "Master key must be CryptoKey object, never string. Use deriveKey + zeroBuffer."
+    languages: [typescript, javascript]
+    severity: ERROR
+    metadata:
+      cwe: "CWE-312: Cleartext Storage of Sensitive Information"
+
+  # ===== Insecure TLS =====
+  - id: zk-vault-reject-unauthorized-false
+    pattern-regex: rejectUnauthorized\s*:\s*false
+    message: "rejectUnauthorized:false disables TLS verification. NEVER use in production."
+    languages: [typescript, javascript]
+    severity: ERROR
+    metadata:
+      cwe: "CWE-295: Improper Certificate Validation"
+
+  # ===== Console.error with sensitive data =====
+  - id: zk-vault-console-error-with-secrets
+    pattern-regex: console\.error\s*\([^)]*(?:password|masterKey|privateKey|apiKey)
+    message: "console.error with sensitive property. Redact before logging."
+    languages: [typescript, javascript]
+    severity: WARN
+    metadata:
+      cwe: "CWE-532"

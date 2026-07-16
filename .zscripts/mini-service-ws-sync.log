@@ -3,7 +3,7 @@ bun install v1.3.14 (0d9b296a)
 
 + socket.io@4.8.3
 
-22 packages installed [178.00ms]
+22 packages installed [114.00ms]
 [ws-sync] Running bun run dev...
 $ bun --hot index.ts
 [ws-sync] WebSocket server en puerto 3003

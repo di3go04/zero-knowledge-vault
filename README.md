@@ -17,6 +17,7 @@ Gestor de Contraseñas Zero-Knowledge para Equipos — cifrado end-to-end en el 
 - [Flujo Multi-Device](#flujo-multi-device)
 - [Testing](#testing)
 - [Seguridad](#seguridad)
+- [Auditoría del Código](#auditoría-del-código)
 
 ---
 
@@ -407,6 +408,68 @@ bun run lint
 ### Reporte de auditoría
 
 Ver `docs/SECURITY_AUDIT_REPORT.md` para el reporte formal de seguridad.
+
+---
+
+## Auditoría del Código
+
+Cualquier revisor (humano o IA) puede auditar el código sistemáticamente y producir una lista de 30+ mejoras concretas.
+
+### Auditoría con un comando
+
+```bash
+bun install
+bun run audit:full
+```
+
+Genera un reporte Markdown en `audit-reports/latest.md` con: SAST (ESLint + Semgrep), SCA (bun audit + Snyk), secret scanning (gitleaks), container scanning (Trivy), auditoría criptográfica específica, verificación de la propiedad zero-knowledge, complejidad ciclomática, dead-code, type-coverage, SBOM (CycloneDX), inventario de endpoints, higiene del historial git, y más.
+
+### Auditorías específicas
+
+```bash
+bun run audit:crypto    # Primitivas criptográficas (requeridas + prohibidas)
+bun run audit:zk        # Verifica que el servidor nunca reciba plaintext
+bun run audit:deps      # Dependencias (bun audit)
+bun run semgrep         # SAST con reglas OWASP/CWE
+bun run gitleaks        # Secret scanning
+bun run complexity      # Complejidad ciclomática > 15
+bun run deadcode        # Código muerto (ts-prune)
+bun run typecov         # Type-coverage %
+bun run sbom            # SBOM CycloneDX 1.5
+```
+
+### CI automático
+
+Cada push a `main` y cada PR ejecutan automáticamente:
+
+- **CodeQL** con query pack `security-and-quality` → `.github/workflows/codeql.yml`
+- **Semgrep** con reglas OWASP/CWE personalizadas → `.github/workflows/semgrep.yml`
+- **Supply Chain**: Snyk, bun audit, Trivy (fs + Docker + IaC), license-checker → `.github/workflows/supply-chain.yml`
+- **Gitleaks** sobre historial git completo → `.github/workflows/secrets.yml`
+
+Los resultados SARIF se suben a la pestaña **Security → Code scanning alerts** del repositorio.
+
+### Documentación para auditores
+
+- `AUDITING.md` — guía paso a paso para auditar el código (humano o IA)
+- `SECURITY_CHECKLIST.md` — 120 puntos verificables con scoring
+- `docs/AI_AUDIT_PROMPT.md` — prompt listo para alimentar a cualquier LLM y obtener 30+ hallazgos estructurados
+- `ARCHITECTURE.md` — modelo de amenazas y stack criptográfico
+- `docs/SECURITY_AUDIT_REPORT.md` — reporte formal de seguridad
+
+### Flujo recomendado para un auditor externo
+
+```bash
+git clone https://github.com/di3go04/zero-knowledge-vault.git
+cd zero-knowledge-vault
+bun install
+bun run audit:full
+# 1. Leer audit-reports/latest.md
+# 2. Leer AUDITING.md y SECURITY_CHECKLIST.md
+# 3. Revisar manualmente src/lib/crypto-client.ts y src/lib/crypto-server.ts
+# 4. Usar docs/AI_AUDIT_PROMPT.md con cualquier LLM para obtener 30+ hallazgos
+# 5. Abrir PR con la rama audit/<nombre>-<fecha>
+```
 
 ---
 

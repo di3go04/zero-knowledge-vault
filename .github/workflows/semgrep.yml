@@ -1,0 +1,55 @@
+name: "🔬 Semgrep SAST"
+
+on:
+  push:
+    branches: [main, source]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1,4"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  semgrep:
+    name: Semgrep scan
+    runs-on: ubuntu-latest
+    container:
+      image: returntocorp/semgrep:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Semgrep with custom rules
+        run: semgrep --config=semgrep.yml --json --output=semgrep.sarif .
+        continue-on-error: true
+
+      - name: Convert to SARIF
+        run: |
+          semgrep --config=semgrep.yml --sarif --output=semgrep.sarif . || true
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+
+      - name: Human-readable summary
+        if: always()
+        run: |
+          semgrep --config=semgrep.yml --text . > semgrep.txt 2>&1 || true
+          echo "## Semgrep Findings" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -50 semgrep.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-report
+          path: |
+            semgrep.sarif
+            semgrep.txt
+          retention-days: 30

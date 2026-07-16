@@ -15,7 +15,7 @@ const colors = { success: "text-primary", error: "text-destructive", warning: "t
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const add = (t: Omit<Toast, "id">) => {
-    const id = Math.random().toString(36).slice(2);
+    const id = (crypto.randomUUID?.() ?? `id-${Date.now()}-${Math.floor(performance.now())}`);
     setToasts((prev) => [...prev, { ...t, id }]);
     setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 5000);
   };

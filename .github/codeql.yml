@@ -1,0 +1,26 @@
+# CodeQL configuration for Zero-Knowledge Vault
+# Custom query suites focused on crypto, auth, and injection vectors.
+
+name: "zk-vault-security"
+
+queries:
+  - uses: security-and-quality
+  - uses: security-extended
+
+paths:
+  - src
+  - scripts
+  - prisma
+
+paths-ignore:
+  - src/extension
+  - src/sdk
+  - src-mobile
+  - src-desktop
+  - examples
+
+query-filters:
+  - exclude:
+      id: js/unused-local-variable
+  - exclude:
+      id: js/hello-world

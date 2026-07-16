@@ -21,6 +21,11 @@ export function timingSafeEqual(a: string, b: string): boolean {
 }
 
 export function addRandomDelay(minMs: number = 0, maxMs: number = 50): Promise<void> {
-  const delay = minMs + Math.random() * (maxMs - minMs);
+  // Use crypto.getRandomValues for cryptographically-suitable jitter.
+  // (Math.random is not a CSPRNG; even for timing jitter, prefer crypto.)
+  const rand = new Uint32Array(1);
+  crypto.getRandomValues(rand);
+  const normalized = rand[0] / 0x100000000; // [0, 1)
+  const delay = minMs + normalized * (maxMs - minMs);
   return new Promise(resolve => setTimeout(resolve, delay));
 }
