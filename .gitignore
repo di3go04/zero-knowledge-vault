@@ -54,6 +54,7 @@ prisma/migrations/dev.db*
 .cache/
 .turbo/
 .eslintcache
+tsconfig.tsbuildinfo
 
 # === Temporales ===
 tmp/
