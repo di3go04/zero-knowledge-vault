@@ -45,7 +45,7 @@ bun run dev
 
 ---
 
-> **El servidor es un *crypto-blind store***: solo almacena blobs cifrados, sales públicas, IVs y llaves públicas. Nunca recibe ni puede descifrar contraseñas maestras, llaves privadas, llaves AES simétricas, ni el contenido de ningún secreto.
+> **El servidor es un _crypto-blind store_**: solo almacena blobs cifrados, sales públicas, IVs y llaves públicas. Nunca recibe ni puede descifrar contraseñas maestras, llaves privadas, llaves AES simétricas, ni el contenido de ningún secreto.
 
 ---
 
@@ -67,21 +67,22 @@ bun run dev
 
 ## Visión General
 
-Zero-Knowledge Vault es un gestor de contraseñas para equipos donde **todo el cifrado ocurre en el navegador** del cliente usando Web Crypto API. El servidor actúa como un almacén ciego (*crypto-blind store*) que persiste blobs cifrados sin poder interpretarlos.
+Zero-Knowledge Vault es un gestor de contraseñas para equipos donde **todo el cifrado ocurre en el navegador** del cliente usando Web Crypto API. El servidor actúa como un almacén ciego (_crypto-blind store_) que persiste blobs cifrados sin poder interpretarlos.
 
 ### ¿Qué significa Zero-Knowledge aquí?
 
-| El servidor NUNCA recibe | El servidor SÍ almacena |
-|---|---|
-| Contraseña maestra | Email del usuario (para login) |
-| Llave maestra derivada (PBKDF2/Argon2id) | Salt público + iteraciones KDF |
-| Llave privada RSA en claro | Llave privada RSA **cifrada** (AES-256-GCM) |
-| Llave AES simétrica de secretos | Llaves AES **envueltas** (RSA-OAEP) |
-| Contenido de secretos | Blobs cifrados (AES-256-GCM) |
-| Frase BIP-39 de recuperación | Backup cifrado con recovery key |
-| Contenido de logs de auditoría | Logs cifrados (AES-256-GCM) |
+| El servidor NUNCA recibe                 | El servidor SÍ almacena                     |
+| ---------------------------------------- | ------------------------------------------- |
+| Contraseña maestra                       | Email del usuario (para login)              |
+| Llave maestra derivada (PBKDF2/Argon2id) | Salt público + iteraciones KDF              |
+| Llave privada RSA en claro               | Llave privada RSA **cifrada** (AES-256-GCM) |
+| Llave AES simétrica de secretos          | Llaves AES **envueltas** (RSA-OAEP)         |
+| Contenido de secretos                    | Blobs cifrados (AES-256-GCM)                |
+| Frase BIP-39 de recuperación             | Backup cifrado con recovery key             |
+| Contenido de logs de auditoría           | Logs cifrados (AES-256-GCM)                 |
 
 **Si la base de datos se compromete**, el atacante obtiene solo blobs cifrados que requieren:
+
 - La contraseña maestra (para PBKDF2/Argon2id → masterKey → descifrar privateKey)
 - O la frase BIP-39 de recuperación (256 bits de entropía)
 
@@ -119,7 +120,7 @@ graph TB
         ZK[ZK Core<br/>encrypt/decrypt<br/>key derivation<br/>signatures]
         UI[React UI<br/>shadcn/ui + Tailwind]
     end
-    
+
     subgraph Server["Servidor (Next.js 16)"]
         API[REST API<br/>App Router]
         P[Prisma ORM]
@@ -127,7 +128,7 @@ graph TB
         DB[(SQLite/Postgres<br/>encrypted blobs only)]
         R[(Redis<br/>optional)]
     end
-    
+
     UI -->|ciphertext + IV only| API
     WC --> ZK
     WA -->|Argon2id KDF| ZK
@@ -142,43 +143,43 @@ graph TB
 
 ### Stack
 
-| Capa | Tecnología |
-|------|-----------|
-| Framework | Next.js 16 (App Router, Turbopack) |
-| Lenguaje | TypeScript 5 (strict) |
-| UI | Tailwind CSS 4 + shadcn/ui (New York) |
-| BD | Prisma ORM + SQLite |
+| Capa         | Tecnología                                                                     |
+| ------------ | ------------------------------------------------------------------------------ |
+| Framework    | Next.js 16 (App Router, Turbopack)                                             |
+| Lenguaje     | TypeScript 5 (strict)                                                          |
+| UI           | Tailwind CSS 4 + shadcn/ui (New York)                                          |
+| BD           | Prisma ORM + SQLite                                                            |
 | Criptografía | Web Crypto API (PBKDF2, Argon2id, AES-256-GCM, RSA-OAEP, RSA-PSS, ECDH, ECDSA) |
-| KDF | Argon2id vía `hash-wasm` en Web Worker |
-| Recuperación | BIP-39 (24 palabras) |
-| Blacklist | Redis (`ioredis`) con fallback Map in-memory |
-| Validación | Zod (14 schemas centralizados) |
-| Tests E2E | Playwright |
-| Estado | Zustand (memoria no persistente) |
+| KDF          | Argon2id vía `hash-wasm` en Web Worker                                         |
+| Recuperación | BIP-39 (24 palabras)                                                           |
+| Blacklist    | Redis (`ioredis`) con fallback Map in-memory                                   |
+| Validación   | Zod (14 schemas centralizados)                                                 |
+| Tests E2E    | Playwright                                                                     |
+| Estado       | Zustand (memoria no persistente)                                               |
 
 ### Endpoints REST (16 + health)
 
-| Endpoint | Método | Descripción | Auth |
-|----------|--------|-------------|------|
-| `/api/auth/register` | POST | Registro con PoP RSA-PSS | No |
-| `/api/auth/login` | POST | Login + emite sessionToken HS256 | No |
-| `/api/auth/logout` | POST | Revoca jti en blacklist | Sí |
-| `/api/auth/rotate` | POST | Rota contraseña maestra | Sí |
-| `/api/auth/recovery/setup` | POST | Configura backup BIP-39 | Sí |
-| `/api/auth/recovery/recover` | POST | Recupera cuenta con frase BIP-39 | No |
-| `/api/secrets` | GET/POST | Lista/Crea secretos cifrados | Sí |
-| `/api/secrets/[id]` | DELETE | Borra secreto (owner-only) | Sí |
-| `/api/shares` | POST/DELETE | Comparte/Revoca share | Sí |
-| `/api/devices/enroll/init` | POST | Dispositivo B inicia enrollment | No |
-| `/api/devices/enroll/lookup` | GET | Dispositivo A busca por enrollCode | Sí |
-| `/api/devices/enroll/complete` | POST | Dispositivo A envía wrappedKey | Sí |
-| `/api/devices/enroll/poll` | POST | Dispositivo B pide challenge | No |
-| `/api/devices/enroll/poll/verify` | POST | Dispositivo B verifica challenge ECDSA | No |
-| `/api/devices/list` | GET | Lista dispositivos autorizados | Sí |
-| `/api/devices/[id]` | DELETE | Revoca dispositivo | Sí |
-| `/api/users/lookup` | GET | Busca usuario por email | No |
-| `/api/users/list` | GET | Lista usuarios del equipo | Sí |
-| `/api/audit-logs` | GET/POST | Lista/Crea logs cifrados | Sí |
+| Endpoint                          | Método      | Descripción                            | Auth |
+| --------------------------------- | ----------- | -------------------------------------- | ---- |
+| `/api/auth/register`              | POST        | Registro con PoP RSA-PSS               | No   |
+| `/api/auth/login`                 | POST        | Login + emite sessionToken HS256       | No   |
+| `/api/auth/logout`                | POST        | Revoca jti en blacklist                | Sí   |
+| `/api/auth/rotate`                | POST        | Rota contraseña maestra                | Sí   |
+| `/api/auth/recovery/setup`        | POST        | Configura backup BIP-39                | Sí   |
+| `/api/auth/recovery/recover`      | POST        | Recupera cuenta con frase BIP-39       | No   |
+| `/api/secrets`                    | GET/POST    | Lista/Crea secretos cifrados           | Sí   |
+| `/api/secrets/[id]`               | DELETE      | Borra secreto (owner-only)             | Sí   |
+| `/api/shares`                     | POST/DELETE | Comparte/Revoca share                  | Sí   |
+| `/api/devices/enroll/init`        | POST        | Dispositivo B inicia enrollment        | No   |
+| `/api/devices/enroll/lookup`      | GET         | Dispositivo A busca por enrollCode     | Sí   |
+| `/api/devices/enroll/complete`    | POST        | Dispositivo A envía wrappedKey         | Sí   |
+| `/api/devices/enroll/poll`        | POST        | Dispositivo B pide challenge           | No   |
+| `/api/devices/enroll/poll/verify` | POST        | Dispositivo B verifica challenge ECDSA | No   |
+| `/api/devices/list`               | GET         | Lista dispositivos autorizados         | Sí   |
+| `/api/devices/[id]`               | DELETE      | Revoca dispositivo                     | Sí   |
+| `/api/users/lookup`               | GET         | Busca usuario por email                | No   |
+| `/api/users/list`                 | GET         | Lista usuarios del equipo              | Sí   |
+| `/api/audit-logs`                 | GET/POST    | Lista/Crea logs cifrados               | Sí   |
 
 ### Tablas Prisma (6)
 
@@ -208,31 +209,40 @@ AuditLog          — userId, encryptedEvent, eventIv, eventCategory
 
 ## Prerrequisitos de Entorno
 
+### Bases de datos soportadas
+
+| Motor      | Uso              | Configuración                                      |
+| ---------- | ---------------- | -------------------------------------------------- |
+| SQLite     | Desarrollo local | `DATABASE_URL=file:./db/custom.db` (por defecto)   |
+| PostgreSQL | Producción       | `DATABASE_URL=postgresql://user:pass@host:5432/db` |
+
+Para PostgreSQL, cambiar `provider = "sqlite"` por `provider = "postgresql"` en `prisma/schema.prisma`.
+
 ### Desarrollo local
 
-| Requisito | Versión mínima | Notas |
-|-----------|----------------|-------|
-| **Bun** | 1.0+ | Runtime recomendado (más rápido que Node) |
-| **Node.js** | 20+ | Alternativo a Bun |
-| **Navegador** | Chrome 94+, Firefox 90+, Safari 15+ | Soporte Web Crypto API + WASM |
+| Requisito     | Versión mínima                      | Notas                                     |
+| ------------- | ----------------------------------- | ----------------------------------------- |
+| **Bun**       | 1.0+                                | Runtime recomendado (más rápido que Node) |
+| **Node.js**   | 20+                                 | Alternativo a Bun                         |
+| **Navegador** | Chrome 94+, Firefox 90+, Safari 15+ | Soporte Web Crypto API + WASM             |
 
 ### Producción
 
-| Requisito | Versión | Obligatorio |
-|-----------|---------|-------------|
-| **Redis** | 6+ | Recomendado (blacklist distribuida, rate-limit, challenge-store). Sin Redis, usa Map in-memory (single-process) |
-| **Node.js** | 20+ | Para servidor Next.js standalone |
-| **HTTPS** | TLS 1.2+ | Obligatorio (sin HTTPS, Web Crypto API no está disponible en algunos navegadores) |
+| Requisito   | Versión  | Obligatorio                                                                                                     |
+| ----------- | -------- | --------------------------------------------------------------------------------------------------------------- |
+| **Redis**   | 6+       | Recomendado (blacklist distribuida, rate-limit, challenge-store). Sin Redis, usa Map in-memory (single-process) |
+| **Node.js** | 20+      | Para servidor Next.js standalone                                                                                |
+| **HTTPS**   | TLS 1.2+ | Obligatorio (sin HTTPS, Web Crypto API no está disponible en algunos navegadores)                               |
 
 ### Navegadores soportados (WASM)
 
-| Navegador | Argon2id (WASM) | Fallback PBKDF2 |
-|-----------|-----------------|-----------------|
-| Chrome 94+ | ✅ | Automático si WASM falla |
-| Firefox 90+ | ✅ | Automático |
-| Safari 15+ | ✅ | Automático |
-| Edge 94+ | ✅ | Automático |
-| iOS Safari 15+ | ✅ | Automático |
+| Navegador      | Argon2id (WASM) | Fallback PBKDF2          |
+| -------------- | --------------- | ------------------------ |
+| Chrome 94+     | ✅              | Automático si WASM falla |
+| Firefox 90+    | ✅              | Automático               |
+| Safari 15+     | ✅              | Automático               |
+| Edge 94+       | ✅              | Automático               |
+| iOS Safari 15+ | ✅              | Automático               |
 
 ---
 
@@ -275,15 +285,15 @@ NODE_ENV=production node .next/standalone/server.js
 
 ### Scripts disponibles
 
-| Script | Descripción |
-|--------|-------------|
-| `bun run dev` | Servidor de desarrollo (puerto 3000) |
-| `bun run build` | Build de producción |
-| `bun run start` | Servidor de producción standalone |
-| `bun run lint` | ESLint (debe pasar con 0 errores) |
-| `bun run db:push` | Sincronizar schema Prisma con BD |
-| `bun run db:generate` | Regenerar Prisma Client |
-| `bun run db:reset` | Resetear BD (¡borra todos los datos!) |
+| Script                | Descripción                           |
+| --------------------- | ------------------------------------- |
+| `bun run dev`         | Servidor de desarrollo (puerto 3000)  |
+| `bun run build`       | Build de producción                   |
+| `bun run start`       | Servidor de producción standalone     |
+| `bun run lint`        | ESLint (debe pasar con 0 errores)     |
+| `bun run db:push`     | Sincronizar schema Prisma con BD      |
+| `bun run db:generate` | Regenerar Prisma Client               |
+| `bun run db:reset`    | Resetear BD (¡borra todos los datos!) |
 
 ### Tests E2E
 
@@ -334,19 +344,19 @@ DECOY_HMAC_KEY=zk-vault-decoy-static-key-change-me
 
 ### Variables por entorno
 
-| Variable | Desarrollo | Producción | Descripción |
-|----------|-----------|------------|-------------|
-| `DATABASE_URL` | `file:./db/custom.db` | `postgresql://...` | SQLite en dev, PostgreSQL en prod |
-| `SESSION_SECRET` | Cualquier string 32+ chars | Aleatorio seguro | Firma de tokens HS256 |
-| `REDIS_URL` | *(no definida)* | `redis://redis:6379` | Sin definir = Map in-memory |
-| `DECOY_HMAC_KEY` | Default | Aleatorio seguro | Anti-enumeración login |
+| Variable         | Desarrollo                 | Producción           | Descripción                       |
+| ---------------- | -------------------------- | -------------------- | --------------------------------- |
+| `DATABASE_URL`   | `file:./db/custom.db`      | `postgresql://...`   | SQLite en dev, PostgreSQL en prod |
+| `SESSION_SECRET` | Cualquier string 32+ chars | Aleatorio seguro     | Firma de tokens HS256             |
+| `REDIS_URL`      | _(no definida)_            | `redis://redis:6379` | Sin definir = Map in-memory       |
+| `DECOY_HMAC_KEY` | Default                    | Aleatorio seguro     | Anti-enumeración login            |
 
 ### Flags internos (no variables de entorno)
 
-| Flag | Ubicación | Default | Descripción |
-|------|-----------|---------|-------------|
-| `PREFER_ARGON2` | `crypto-client.ts` | `true` | Intenta Argon2id primero, fallback honesto a PBKDF2 |
-| `USE_ARGON2` | *(eliminado)* | — | Reemplazado por `PREFER_ARGON2` con fallback automático |
+| Flag            | Ubicación          | Default | Descripción                                             |
+| --------------- | ------------------ | ------- | ------------------------------------------------------- |
+| `PREFER_ARGON2` | `crypto-client.ts` | `true`  | Intenta Argon2id primero, fallback honesto a PBKDF2     |
+| `USE_ARGON2`    | _(eliminado)_      | —       | Reemplazado por `PREFER_ARGON2` con fallback automático |
 
 ---
 
@@ -422,6 +432,7 @@ El flujo Multi-Device permite que un usuario acceda desde un dispositivo nuevo s
 **¿Por qué es necesario?** El Dispositivo B necesita derivar el mismo shared secret ECDH que el Dispositivo A usó para envolver la privateKey. Para ello, B necesita la publicKey efímera de A.
 
 **Flujo del dato**:
+
 1. Dispositivo A genera par ECDH efímero.
 2. A deriva shared secret: `A.privateKey × B.publicKey`.
 3. A envuelve privateKey RSA con el shared secret.
@@ -448,6 +459,7 @@ npx playwright test
 ```
 
 **Cobertura**:
+
 - **Multi-Device E2E**: registro → crear secreto → enroll device → verificar challenge-response → descifrar
 - **No-leak assertion**: interceptor de red verifica que la contraseña maestra NUNCA aparece en peticiones `/api/*`
 - **Validación Zod**: 6 tests que verifican 400/401 en payloads inválidos
@@ -466,17 +478,17 @@ bun run lint
 
 ### Modelo de amenazas
 
-| Amenaza | Mitigación |
-|---------|------------|
-| **BD comprometida** | Solo blobs cifrados. Sin contraseña maestra → sin PBKDF2/Argon2id → sin descifrado |
-| **MITM activo** | TOFU con fingerprint SHA-256 + HTTPS obligatorio |
-| **Servidor malicioso** | Sustitución de publicKey detectada por PoP + TOFU |
-| **Fuerza bruta offline** | Argon2id (64 MiB memory-hard) + rate limiting |
-| **Fuerza bruta ECDSA** | Rate limiting 5/min en `poll/verify` |
-| **Enumeración de emails** | Login decoy determinista (HMAC-SHA-256) |
-| **Sesión comprometida** | Logout server-side real (Redis blacklist con jti + TTL) |
-| **Dispositivo perdido** | Revocación de dispositivo + rotación de contraseña maestra |
-| **Contraseña olvidada** | Recovery Key BIP-39 (24 palabras, 256 bits) |
+| Amenaza                   | Mitigación                                                                         |
+| ------------------------- | ---------------------------------------------------------------------------------- |
+| **BD comprometida**       | Solo blobs cifrados. Sin contraseña maestra → sin PBKDF2/Argon2id → sin descifrado |
+| **MITM activo**           | TOFU con fingerprint SHA-256 + HTTPS obligatorio                                   |
+| **Servidor malicioso**    | Sustitución de publicKey detectada por PoP + TOFU                                  |
+| **Fuerza bruta offline**  | Argon2id (64 MiB memory-hard) + rate limiting                                      |
+| **Fuerza bruta ECDSA**    | Rate limiting 5/min en `poll/verify`                                               |
+| **Enumeración de emails** | Login decoy determinista (HMAC-SHA-256)                                            |
+| **Sesión comprometida**   | Logout server-side real (Redis blacklist con jti + TTL)                            |
+| **Dispositivo perdido**   | Revocación de dispositivo + rotación de contraseña maestra                         |
+| **Contraseña olvidada**   | Recovery Key BIP-39 (24 palabras, 256 bits)                                        |
 
 ### Reporte de auditoría
 

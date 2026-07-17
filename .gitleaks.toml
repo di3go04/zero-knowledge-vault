@@ -1,0 +1,15 @@
+title = "Zero-Knowledge Vault Gitleaks Config"
+
+[allowlist]
+description = "Allowlist for known test values and example configs"
+paths = [
+  ".env.example",
+  "src/lib/__tests__/",
+  "prisma/",
+]
+
+[[rules]]
+id = "zk-vault-env-example"
+description = "Detect .env.example placeholder secrets"
+regex = '''SESSION_SECRET=zk-vault-session-secret-change-in-prod'''
+path = ".env.example"
