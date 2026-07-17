@@ -80,6 +80,7 @@ const eslintConfig = [
       "tool-results/**",
       "scripts/**",
       "eslint.config.mjs",
+      ".lighthouserc.js",
     ],
   },
 ];

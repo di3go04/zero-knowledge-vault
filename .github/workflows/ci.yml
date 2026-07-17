@@ -268,3 +268,33 @@ jobs:
             .next/static/
             public/
           retention-days: 7
+
+  # ===================================================================
+  # Job 5: Notifications (Discord / Slack)
+  # ===================================================================
+  notify:
+    name: Send Notification
+    runs-on: ubuntu-latest
+    needs: [lint-and-typecheck, e2e-tests, security-audit, build]
+    if: always() && (github.ref == 'refs/heads/main')
+    steps:
+      - name: Notify Discord
+        if: ${{ secrets.DISCORD_WEBHOOK_URL != '' }}
+        uses: tsickert/discord-webhook@v6
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          content: |
+            🏗️ Build ${{ needs.build.result }} | 🧪 Tests ${{ needs.e2e-tests.result }} | 🔒 Security ${{ needs.security-audit.result }}
+            Commit: ${{ github.sha }}
+            Actor: ${{ github.actor }}
+      
+      - name: Notify Slack
+        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+        uses: slackapi/slack-github-action@v2
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": "ZK Vault Build: ${{ needs.build.result }}\nTests: ${{ needs.e2e-tests.result }}\nSecurity: ${{ needs.security-audit.result }}\nCommit: ${{ github.sha }}"
+            }

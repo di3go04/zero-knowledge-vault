@@ -1,0 +1,11 @@
+{
+  "name": "@zk-vault/config",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./index.js",
+  "exports": {
+    "./eslint": "./eslint-preset.js",
+    "./prettier": "./prettier-preset.js",
+    "./tsconfig": "./tsconfig.json"
+  }
+}
