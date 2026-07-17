@@ -2,12 +2,57 @@
 
 Gestor de Contraseñas Zero-Knowledge para Equipos — cifrado end-to-end en el navegador con Web Crypto API.
 
+<p align="center">
+  <a href="docs/DEMO.md">
+    <img src="https://img.shields.io/badge/demo-walkthrough-blue?style=for-the-badge" alt="Demo Walkthrough">
+  </a>
+  <a href="SECURITY.md">
+    <img src="https://img.shields.io/badge/security-policy-green?style=for-the-badge" alt="Security Policy">
+  </a>
+  <a href="CHANGELOG.md">
+    <img src="https://img.shields.io/badge/changelog-v0.2.0-orange?style=for-the-badge" alt="Changelog">
+  </a>
+</p>
+
+## ✨ Demo
+
+[➡️ Ver walkthrough completo →](docs/DEMO.md)
+
+Incluye: registro, creación de secretos, sharing, multi-device enrollment y verificación de seguridad.
+
+---
+
+## 🚀 Quick Start (5 minutos)
+
+```bash
+# 1. Prerrequisitos: Bun 1.0+ o Node.js 20+
+# 2. Clonar e instalar
+git clone https://github.com/di3go04/zero-knowledge-vault.git
+cd zero-knowledge-vault
+bun install
+
+# 3. Configurar variables de entorno
+cp .env.example .env
+# Editar SESSION_SECRET con un secreto fuerte (32+ chars)
+
+# 4. Inicializar BD y arrancar
+bun run db:push
+bun run dev
+# → http://localhost:3000
+```
+
+> ¿Primera vez con un gestor zero-knowledge? Revisa la [demo guiada](docs/DEMO.md) para entender el flujo completo.
+
+---
+
 > **El servidor es un *crypto-blind store***: solo almacena blobs cifrados, sales públicas, IVs y llaves públicas. Nunca recibe ni puede descifrar contraseñas maestras, llaves privadas, llaves AES simétricas, ni el contenido de ningún secreto.
 
 ---
 
 ## Tabla de Contenidos
 
+- [Quick Start](#-quick-start-5-minutos)
+- [Demo](#-demo)
 - [Visión General](#visión-general)
 - [Garantías Zero-Knowledge](#garantías-zero-knowledge)
 - [Arquitectura Técnica](#arquitectura-técnica)
@@ -65,6 +110,35 @@ Sin ninguno de los dos, los datos son criptográficamente inaccesibles.
 ---
 
 ## Arquitectura Técnica
+
+```mermaid
+graph TB
+    subgraph Browser["Navegador (Cliente)"]
+        WC[Web Crypto API<br/>AES-256-GCM, RSA-OAEP,<br/>ECDH, ECDSA, RSA-PSS]
+        WA[Argon2 Worker<br/>hash-wasm WASM<br/>64 MiB memory]
+        ZK[ZK Core<br/>encrypt/decrypt<br/>key derivation<br/>signatures]
+        UI[React UI<br/>shadcn/ui + Tailwind]
+    end
+    
+    subgraph Server["Servidor (Next.js 16)"]
+        API[REST API<br/>App Router]
+        P[Prisma ORM]
+        V[Validation Zod<br/>16 schemas]
+        DB[(SQLite/Postgres<br/>encrypted blobs only)]
+        R[(Redis<br/>optional)]
+    end
+    
+    UI -->|ciphertext + IV only| API
+    WC --> ZK
+    WA -->|Argon2id KDF| ZK
+    ZK -->|encrypted data| UI
+    API --> V
+    API --> P
+    P --> DB
+    API -.-> R
+```
+
+> **El servidor solo almacena blobs cifrados** — nunca recibe contraseñas maestras, llaves privadas, llaves AES ni contenido de secretos.
 
 ### Stack
 
