@@ -1,0 +1,4760 @@
+================================================================================
+ ZERO-KNOWLEDGE VAULT - CODIGO COMPLETO CONCATENADO
+================================================================================
+ Repositorio:  https://github.com/di3go04/zero-knowledge-vault
+ Branch:       main
+================================================================================
+
+================================================================================
+  CONFIG: package.json
+================================================================================
+  Ruta original:  package.json
+  Tamano:         3887 bytes
+  Lineas:         115
+================================================================================
+----- inicio del archivo -----
+
+{
+  "name": "nextjs_tailwind_shadcn_ts",
+  "version": "0.2.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
+    "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "prepare": "husky || true",
+    "db:push": "prisma db push",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:reset": "prisma migrate reset",
+    "db:seed": "bun run src/lib/__tests__/seed-test-data.ts"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@hookform/resolvers": "^5.1.1",
+    "@mdxeditor/editor": "^3.39.1",
+    "@noble/curves": "^2.2.0",
+    "@noble/hashes": "^2.2.0",
+    "@prisma/client": "^6.11.1",
+    "@radix-ui/react-accordion": "^1.2.11",
+    "@radix-ui/react-alert-dialog": "^1.1.14",
+    "@radix-ui/react-aspect-ratio": "^1.1.7",
+    "@radix-ui/react-avatar": "^1.1.10",
+    "@radix-ui/react-checkbox": "^1.3.2",
+    "@radix-ui/react-collapsible": "^1.1.11",
+    "@radix-ui/react-context-menu": "^2.2.15",
+    "@radix-ui/react-dialog": "^1.1.14",
+    "@radix-ui/react-dropdown-menu": "^2.1.15",
+    "@radix-ui/react-hover-card": "^1.1.14",
+    "@radix-ui/react-label": "^2.1.7",
+    "@radix-ui/react-menubar": "^1.1.15",
+    "@radix-ui/react-navigation-menu": "^1.2.13",
+    "@radix-ui/react-popover": "^1.1.14",
+    "@radix-ui/react-progress": "^1.1.7",
+    "@radix-ui/react-radio-group": "^1.3.7",
+    "@radix-ui/react-scroll-area": "^1.2.9",
+    "@radix-ui/react-select": "^2.2.5",
+    "@radix-ui/react-separator": "^1.1.7",
+    "@radix-ui/react-slider": "^1.3.5",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-switch": "^1.2.5",
+    "@radix-ui/react-tabs": "^1.1.12",
+    "@radix-ui/react-toast": "^1.2.14",
+    "@radix-ui/react-toggle": "^1.1.9",
+    "@radix-ui/react-toggle-group": "^1.1.10",
+    "@radix-ui/react-tooltip": "^1.2.7",
+    "@reactuses/core": "^6.0.5",
+    "@sentry/nextjs": "^10.66.0",
+    "@simplewebauthn/browser": "^13.3.0",
+    "@simplewebauthn/server": "^13.3.2",
+    "@tanstack/react-query": "^5.82.0",
+    "@tanstack/react-table": "^8.21.3",
+    "bip39": "^3.1.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
+    "crystals-kyber-js": "^2.7.0",
+    "date-fns": "^4.1.0",
+    "embla-carousel-react": "^8.6.0",
+    "framer-motion": "^12.23.2",
+    "hash-wasm": "^4.12.0",
+    "input-otp": "^1.4.2",
+    "ioredis": "^5.11.1",
+    "lucide-react": "^0.525.0",
+    "next": "^16.1.1",
+    "next-auth": "^4.24.11",
+    "next-intl": "^4.3.4",
+    "next-themes": "^0.4.6",
+    "pino": "^10.3.1",
+    "prisma": "^6.11.1",
+    "react": "^19.0.0",
+    "react-day-picker": "^9.8.0",
+    "react-dom": "^19.0.0",
+    "react-hook-form": "^7.60.0",
+    "react-markdown": "^10.1.0",
+    "react-resizable-panels": "^3.0.3",
+    "react-syntax-highlighter": "^15.6.1",
+    "recharts": "^2.15.4",
+    "reflect-metadata": "^0.2.2",
+    "sharp": "^0.34.3",
+    "sonner": "^2.0.6",
+    "tailwind-merge": "^3.3.1",
+    "tailwindcss-animate": "^1.0.7",
+    "tsyringe": "^4.10.0",
+    "uuid": "^11.1.0",
+    "vaul": "^1.1.2",
+    "z-ai-web-dev-sdk": "^0.0.18",
+    "zod": "^4.0.2",
+    "zustand": "^5.0.6"
+  },
+  "devDependencies": {
+    "@next/bundle-analyzer": "^16.2.10",
+    "@tailwindcss/postcss": "^4",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitest/coverage-istanbul": "^4.1.10",
+    "bun-types": "^1.3.4",
+    "eslint": "^9",
+    "eslint-config-next": "^16.1.1",
+    "tailwindcss": "^4",
+    "tw-animate-css": "^1.3.5",
+    "typescript": "^5",
+    "vitest": "^4.1.10"
+  }
+}
+
+----- fin del archivo -----
+
+
+================================================================================
+  CONFIG: tsconfig.json
+================================================================================
+  Ruta original:  tsconfig.json
+  Tamano:         935 bytes
+  Lineas:         46
+================================================================================
+----- inicio del archivo -----
+
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "noEmit": true,
+    "noImplicitAny": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "examples",
+    "skills",
+    "mini-services",
+    "playwright.config.ts",
+    "scripts/e2e-multi-device.spec.ts",
+    "scripts/test-pop.ts",
+    "upload",
+    "download"
+  ]
+}
+
+----- fin del archivo -----
+
+
+================================================================================
+  CONFIG: next.config.ts
+================================================================================
+  Ruta original:  next.config.ts
+  Tamano:         1503 bytes
+  Lineas:         48
+================================================================================
+----- inicio del archivo -----
+
+import type { NextConfig } from "next";
+import createNextIntlPlugin from "next-intl/plugin";
+
+const withNextIntl = createNextIntlPlugin("./src/lib/i18n/request.ts");
+
+const nextConfig: NextConfig = {
+  output: "standalone",
+  typescript: {
+    ignoreBuildErrors: false,
+  },
+  reactStrictMode: true,
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value:
+              "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://api.hcaptcha.com https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com https://hcaptcha.com; worker-src 'self' blob:",
+          },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains; preload",
+          },
+          {
+            key: "X-Frame-Options",
+            value: "DENY",
+          },
+          {
+            key: "X-Content-Type-Options",
+            value: "nosniff",
+          },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+          },
+        ],
+      },
+    ];
+  },
+};
+
+export default withNextIntl(nextConfig);
+
+----- fin del archivo -----
+
+
+================================================================================
+  DB SCHEMA: prisma/schema.prisma
+================================================================================
+  Ruta original:  prisma/schema.prisma
+  Tamano:         37754 bytes
+  Lineas:         978
+================================================================================
+----- inicio del archivo -----
+
+// =====================================================================
+// Zero-Knowledge Password Manager — Prisma Schema
+// =====================================================================
+// El servidor actúa como "crypto-blind store": SOLO almacena blobs
+// cifrados, sales, IVs y llaves públicas. Nunca recibe ni almacena
+// llaves maestras, llaves privadas en claro, ni claves simétricas.
+// =====================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite" // Cambiar a "postgresql" para producción con PostgreSQL
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------
+// Usuario: solo metadatos. La contraseña NUNCA se almacena.
+// ---------------------------------------------------------------------
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  keyMaterial            UserKeyMaterial?
+  ownedSecrets           Secret[]
+  secretKeyShares        SecretKeyShare[]
+  devices                Device[]
+  auditLogs              AuditLog[]
+  webAuthnCredentials    WebAuthnCredential[]
+  emergencyGrants        EmergencyAccess[]    @relation("EmergencyGrantor")
+  emergencyBeneficiaries EmergencyAccess[]    @relation("EmergencyBeneficiary")
+  scimUser               ScimUser?
+  userRoles              UserRole[]
+  groupMemberships       GroupMember[]
+  approvalRequests       ApprovalRequest[]    @relation("ApprovalRequester")
+  approvalApprovals      ApprovalRequest[]    @relation("ApprovalApprover")
+  breakGlassAccesses     BreakGlassAccess[]   @relation("BreakGlassRequester")
+  breakGlassApprovals    BreakGlassAccess[]   @relation("BreakGlassApprover")
+  complianceReports      ComplianceReport[]
+  eDiscoveryExports      EDiscoveryExport[]
+  actionTokens           UserActionToken[]
+  accessRequests         AccessRequest[]
+}
+
+// ---------------------------------------------------------------------
+// Multi-Device Sync (ECDH)
+// ---------------------------------------------------------------------
+// Cada dispositivo autorizado tiene su propio par ECDH (P-256). La
+// privateKey RSA del usuario se envuelve (wrap) con una llave simétrica
+// derivada vía ECDH entre la publicKey ECDH del dispositivo y una
+// privateKey ECDH efímera del dispositivo que autoriza.
+//
+// Flujo "Enroll Device":
+//   1. Dispositivo B genera par ECDH, muestra código + publicKeyECDH.
+//   2. Dispositivo A (logueado) escanea, deriva ECDH shared secret,
+//      envuelve la privateKey RSA del usuario con ese shared secret.
+//   3. Servidor almacena el blob en Device.wrappedPrivateKeyForDevice.
+//   4. Dispositivo B hace polling, recibe el blob, desenvuelve con su
+//      privateKey ECDH, obtiene la privateKey RSA del usuario.
+//
+// El servidor NUNCA ve la privateKey RSA en claro ni el shared secret
+// ECDH (que solo existe en los dos dispositivos).
+// ---------------------------------------------------------------------
+model Device {
+  id                         String    @id @default(cuid())
+  userId                     String
+  user                       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceName                 String
+  // Llave pública ECDH P-256 del dispositivo NUEVO (B) — JWK, en claro
+  publicKeyECDH              String // JSON
+  publicKeyECDHFingerprint   String // hex SHA-256 del JWK canonizado
+  // Post-Quantum: Llave pública Kyber ML-KEM 768 del dispositivo B (base64)
+  publicKeyKyber             String? // base64, null si no soporta PQ
+  // Ciphertext Kyber generado por dispositivo A para que B pueda decapsular
+  kyberCiphertext            String? // base64, null hasta que A completa
+  // Llave pública ECDH P-256 EFÍMERA del dispositivo AUTORIZADOR (A) — JWK
+  // Se guarda cuando A completa el enrollment, para que B pueda derivar
+  // el shared secret ECDH y desenvolver la wrappedPrivateKey.
+  enrollerPublicKeyECDH      String? // JSON, null hasta que A completa
+  // PrivateKey RSA del usuario, envuelta con la llave simétrica derivada
+  // vía ECDH entre este dispositivo y el dispositivo que lo autorizó.
+  // Si el envío es híbrido, la llave AES deriva de ECDH + Kyber combinados.
+  wrappedPrivateKeyForDevice String // base64, AES-256-GCM
+  wrappedPrivateKeyIv        String // base64, 12 bytes
+  // Algoritmo usado: "ecdh" (clásico) o "hybrid-ecdh-kyber768" (post-quántico)
+  keyExchangeAlgorithm       String    @default("hybrid-ecdh-kyber768")
+  enrollCode                 String? // código de 6 dígitos (solo durante enrollment)
+  enrollCodeExpiresAt        DateTime?
+  enrolledAt                 DateTime  @default(now())
+  lastSeenAt                 DateTime  @default(now())
+  revokedAt                  DateTime? // null = activo
+
+  @@index([userId])
+  @@index([enrollCode])
+}
+
+// ---------------------------------------------------------------------
+// Material criptográfico del usuario.
+// - kdfSalt: SAL en claro (base64). Pública. Necesaria para PBKDF2.
+// - kdfIterations: int. Público.
+// - publicKeyJwk: JSON en claro. Llave pública RSA-OAEP.
+// - encryptedPrivateKeyJwk: BLOB cifrado (AES-256-GCM) con la llave
+//   maestra derivada del password del usuario. El servidor NO puede
+//   descifrar esto.
+// - privateKeyIv: IV en claro (base64) usado para cifrar la llave privada.
+// ---------------------------------------------------------------------
+model UserKeyMaterial {
+  id                     String @id @default(cuid())
+  userId                 String @unique
+  user                   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // KDF — Argon2id (preferido) o PBKDF2 (legacy)
+  kdfAlgorithm           String @default("argon2id") // "argon2id" | "pbkdf2"
+  kdfSalt                String // base64, público
+  kdfIterations          Int // Argon2id: t (time). PBKDF2: iteraciones.
+  kdfMemoryKiB           Int? // Argon2id: m (memory). PBKDF2: null.
+  kdfParallelism         Int? // Argon2id: p (parallelism). PBKDF2: null.
+  publicKeyJwk           String // JSON string, público
+  publicKeyFingerprint   String // hex SHA-256 del JWK canonizado — para TOFU y detección de sustitución
+  popSignature           String // base64 — firma RSA-PSS de {email, publicKeyFingerprint, kdfSalt} con la privateKey
+  popSignatureHash       String // "SHA-256" — algoritmo usado para la firma PoP (auditabilidad)
+  encryptedPrivateKeyJwk String // base64, AES-256-GCM ciphertext con masterKey
+  privateKeyIv           String // base64, público
+
+  // Recovery Key (BIP-39) — backup cifrado de la privateKey RSA
+  // El usuario recibe 24 palabras en el registro. Estas se derivan a
+  // una llave AES-256 que cifra la MISMA privateKey RSA. Si el usuario
+  // olvida su contraseña maestra, puede usar la frase de 24 palabras
+  // para descifrar este blob y recuperar su cuenta.
+  // El servidor NUNCA ve las 24 palabras — solo el blob cifrado.
+  recoverySalt                   String? // base64, salt para derivar recovery key
+  recoveryIterations             Int? // PBKDF2 iteraciones para recovery key (puede ser alto, no bloquea UI)
+  encryptedPrivateKeyForRecovery String? // base64, AES-256-GCM con recovery key
+  recoveryIv                     String? // base64, 12 bytes
+  recoveryEnabled                Boolean @default(false)
+
+  // Master key rotation: cada 30 días el usuario debe rotar su contraseña
+  // maestra para limitar el daño si una masterKey fue comprometida.
+  lastKeyRotationAt DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([publicKeyFingerprint])
+}
+
+// ---------------------------------------------------------------------
+// Emergency Access / Herencia Digital
+// ---------------------------------------------------------------------
+// Permite a un usuario designar herederos que pueden recuperar el acceso
+// a su bóveda tras un periodo de inactividad o con time-lock + aprobación.
+//
+// Flujo:
+//   1. Owner crea un grant: especifica beneficiary, delayHours, message.
+//   2. Beneficiary reclama el grant → se inicia el time-lock.
+//   3. Durante el time-lock, el owner puede cancelar.
+//   4. Pasado el time-lock, el beneficiary puede recuperar la bóveda.
+//      El servidor entrega el encryptedPrivateKeyForRecovery (si existe)
+//      o el wrappedPrivateKey de un dispositivo.
+// ---------------------------------------------------------------------
+model EmergencyAccess {
+  id            String    @id @default(cuid())
+  grantorId     String
+  grantor       User      @relation("EmergencyGrantor", fields: [grantorId], references: [id], onDelete: Cascade)
+  beneficiaryId String
+  beneficiary   User      @relation("EmergencyBeneficiary", fields: [beneficiaryId], references: [id], onDelete: Cascade)
+  message       String? // Mensaje del grantor al beneficiary
+  delayHours    Int       @default(72) // 72h por defecto
+  // Estados: "pending" → "active" (time-lock started) → "approved" (reclamado) → "cancelled"
+  status        String    @default("pending") // pending | active | cancelled | completed
+  claimedAt     DateTime? // Cuando el beneficiary inició el reclamo
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([grantorId, beneficiaryId])
+  @@index([beneficiaryId])
+}
+
+// ---------------------------------------------------------------------
+// Password Policies — configurables por organización
+// ---------------------------------------------------------------------
+model PasswordPolicy {
+  id                String   @id @default(cuid())
+  name              String   @default("default")
+  minLength         Int      @default(12)
+  maxLength         Int      @default(128)
+  requireUppercase  Boolean  @default(true)
+  requireLowercase  Boolean  @default(true)
+  requireNumbers    Boolean  @default(true)
+  requireSymbols    Boolean  @default(true)
+  expirationDays    Int      @default(90)
+  minUniqueChars    Int      @default(6)
+  historySize       Int      @default(5) // No repetir últimas N contraseñas
+  maxFailedAttempts Int      @default(5)
+  lockoutMinutes    Int      @default(15)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------
+// WebAuthn (FIDO2 / Passkeys) — autenticación sin contraseña
+// ---------------------------------------------------------------------
+// Soporta tanto hardware tokens (YubiKey) como authenticators de
+// plataforma (Touch ID, Windows Hello, Face ID, passkeys).
+// Cada credencial pertenece a un usuario y se usa como 2FA o como
+// método de login sin contraseña.
+// ---------------------------------------------------------------------
+model WebAuthnCredential {
+  id             String   @id
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialId   String   @unique
+  publicKey      String // base64, llave pública cose
+  counter        BigInt   @default(0)
+  transports     String // JSON array: ["usb", "nfc", "ble", "internal"]
+  deviceName     String? // Etiqueta: "YubiKey 5C NFC", "iPhone Passkey"
+  credentialType String   @default("platform") // "platform" = passkey, "cross-platform" = YubiKey
+  createdAt      DateTime @default(now())
+  lastUsedAt     DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------
+// Secreto: contenido cifrado con AES-256-GCM.
+// - El título TAMBIÉN va cifrado (Zero-Knowledge estricto).
+// - encryptedData / encryptedTitle: blobs AES-256-GCM.
+// - El servidor no conoce ni el título ni el contenido.
+// ---------------------------------------------------------------------
+model Secret {
+  id                String   @id @default(cuid())
+  ownerId           String
+  owner             User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  encryptedTitle    String // base64, AES-256-GCM
+  titleIv           String // base64
+  encryptedData     String // base64, AES-256-GCM
+  dataIv            String // base64
+  encryptedMetadata String? // base64, AES-256-GCM — tags, URLs, notes cifrados
+  metadataIv        String? // base64
+  secretType        String   @default("password") // password | note | ssh-key | api-key | certificate | database
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  keyShares SecretKeyShare[]
+}
+
+// ---------------------------------------------------------------------
+// Share: la clave simétrica AES que desencripta el secreto, "envuelta"
+// (wrapped) con la llave PÚBLICA RSA-OAEP del destinatario.
+// - Solo el destinatario puede desenvolverla con su llave privada.
+// - El servidor nunca ve la clave simétrica en claro.
+// - El propietario del secreto también tiene un share para sí mismo.
+// ---------------------------------------------------------------------
+model SecretKeyShare {
+  id                  String   @id @default(cuid())
+  secretId            String
+  secret              Secret   @relation(fields: [secretId], references: [id], onDelete: Cascade)
+  recipientId         String
+  recipient           User     @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  wrappedSymmetricKey String // base64, RSA-OAEP(AES key)
+  createdAt           DateTime @default(now())
+
+  @@unique([secretId, recipientId])
+}
+
+// ---------------------------------------------------------------------
+// Audit Log cifrado (Zero-Knowledge Logging)
+// ---------------------------------------------------------------------
+// Los logs se generan y CIFRAN en el cliente (AES-256-GCM con una llave
+// de auditoría derivada de la masterKey del usuario). El servidor solo
+// almacena blobs cifrados + metadata mínima (timestamp, tipo de evento
+// cifrado). Esto permite auditoría forense sin filtrar información
+// sensible en logs del servidor.
+//
+// La llave de auditoría es distinta de la masterKey para evitar que un
+// atacante con la masterKey (ej. via sesión abierta) pueda leer los logs
+// históricos. Se deriva como HKDF(masterKey, "audit-log-v1").
+// ---------------------------------------------------------------------
+model AuditLog {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  encryptedEvent    String // base64, AES-256-GCM
+  eventIv           String // base64, 12 bytes
+  eventCategory     String // "auth" | "secret" | "share" | "rotation" | "device"
+  // Hash chain: SHA-256 del encryptedEvent del log anterior del mismo usuario.
+  // Crea una cadena inmutable: alterar un log requiere recalcular todos los
+  // hashes siguientes. El primer log de un usuario tiene previousHash="".
+  previousEventHash String   @default("")
+  // HMAC-SHA256 del encryptedEvent usando la auditKey derivada (se verifica
+  // en el cliente al descifrar). Sirve como prueba de integridad adicional.
+  eventSignature    String   @default("")
+  createdAt         DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([eventCategory])
+  @@index([previousEventHash])
+}
+
+// ---------------------------------------------------------------------
+// Enterprise Feature Models (#21–#30)
+// ---------------------------------------------------------------------
+
+// #21 — SCIM 2.0 Provisioning
+model ScimUser {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  externalId String   @unique
+  userName   String   @unique
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([externalId])
+  @@index([userName])
+}
+
+// #22 — SAML 2.0 / OIDC SSO Provider
+model SsoProvider {
+  id               String   @id @default(cuid())
+  providerType     String // "saml" | "oidc"
+  providerName     String   @unique
+  issuerUrl        String
+  clientId         String?
+  clientSecret     String?
+  metadataUrl      String?
+  metadataXml      String?
+  attributeMapping String? // JSON
+  enabled          Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// #23 — LDAP / Active Directory Connector
+model DirectoryConnector {
+  id                String    @id @default(cuid())
+  name              String    @unique
+  providerType      String // "ldap" | "active-directory"
+  url               String
+  baseDn            String
+  bindDn            String
+  bindPassword      String // encrypted at rest
+  userSearchFilter  String    @default("(objectClass=person)")
+  groupSearchFilter String    @default("(objectClass=group)")
+  syncIntervalSec   Int       @default(3600)
+  enabled           Boolean   @default(true)
+  lastSyncAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+// #24 — RBAC Granular
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  permissions         Permission[]
+  userRoles           UserRole[]
+  scopes              RoleScope[]
+  permissionOverrides RolePermissionOverride[]
+}
+
+model Permission {
+  id         String   @id @default(cuid())
+  roleId     String
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  action     String
+  resource   String
+  conditions String? // JSON — future ABAC conditions
+  createdAt  DateTime @default(now())
+
+  @@unique([roleId, action, resource])
+}
+
+model UserRole {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId     String
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  assignedBy String?
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+}
+
+// #25 — Group Policies
+model UserGroup {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members  GroupMember[]
+  policies GroupPolicy[]
+}
+
+model GroupMember {
+  id        String    @id @default(cuid())
+  groupId   String
+  group     UserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String    @default("member") // "member" | "admin"
+  createdAt DateTime  @default(now())
+
+  @@unique([groupId, userId])
+  @@index([groupId])
+  @@index([userId])
+}
+
+model GroupPolicy {
+  id          String    @id @default(cuid())
+  groupId     String
+  group       UserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  policyType  String // "password" | "session" | "mfa" | "sharing"
+  policyValue String // JSON
+  enabled     Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([groupId, policyType])
+  @@index([groupId])
+}
+
+// #26 — Approval Workflows
+model ApprovalRequest {
+  id              String    @id @default(cuid())
+  requesterId     String
+  requester       User      @relation("ApprovalRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  action          String // "share" | "export" | "emergency-access" | "admin-action"
+  resourceType    String // "secret" | "vault" | "setting"
+  resourceId      String?
+  reason          String
+  status          String    @default("pending") // "pending" | "approved" | "rejected" | "cancelled"
+  approvedById    String?
+  approvedBy      User?     @relation("ApprovalApprover", fields: [approvedById], references: [id])
+  approverComment String?
+  expiresAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([requesterId])
+  @@index([status])
+}
+
+// #27 — Dual Control / Break-Glass
+model BreakGlassAccess {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation("BreakGlassRequester", fields: [userId], references: [id], onDelete: Cascade)
+  reason      String
+  status      String    @default("pending") // "pending" | "approved" | "denied" | "expired"
+  approverId  String?
+  approver    User?     @relation("BreakGlassApprover", fields: [approverId], references: [id])
+  approvedAt  DateTime?
+  expiresAt   DateTime?
+  accessToken String? // HMAC token temporal
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+// #28 — Webhooks for SIEM
+model WebhookConfig {
+  id              String    @id @default(cuid())
+  name            String
+  url             String
+  secret          String? // HMAC secret for payload signing
+  events          String // JSON array — ["auth:login", "secret:read", ...]
+  enabled         Boolean   @default(true)
+  retryCount      Int       @default(3)
+  timeoutMs       Int       @default(5000)
+  lastTriggeredAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// #30 — Compliance Reports
+model ComplianceReport {
+  id            String    @id @default(cuid())
+  reportType    String // "soc2" | "hipaa" | "gdpr" | "custom" | "admin-audit"
+  periodStart   DateTime
+  periodEnd     DateTime
+  status        String    @default("pending") // "pending" | "generating" | "completed" | "failed"
+  parameters    String? // JSON
+  resultData    String? // JSON
+  generatedById String?
+  generatedBy   User?     @relation(fields: [generatedById], references: [id])
+  createdAt     DateTime  @default(now())
+  completedAt   DateTime?
+
+  @@index([reportType])
+  @@index([status])
+}
+
+// =====================================================================
+// Enterprise Feature Models (#31–#40)
+// =====================================================================
+
+// #31 — eDiscovery / Forensic Export
+model EDiscoveryExport {
+  id            String    @id @default(cuid())
+  requestedById String
+  targetUserId  String
+  requestedBy   User      @relation(fields: [requestedById], references: [id])
+  reason        String
+  dataTypes     String // JSON array
+  status        String    @default("pending") // "pending" | "completed" | "failed"
+  exportData    String? // JSON
+  expiresAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([targetUserId])
+  @@index([requestedById])
+  @@index([status])
+}
+
+// #32 — DLP (Data Loss Prevention)
+model DlpRule {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  pattern      String
+  action       String // "block" | "alert" | "mask" | "audit"
+  resourceType String   @default("all") // "secret" | "note" | "all"
+  severity     String   @default("medium") // "low" | "medium" | "high" | "critical"
+  enabled      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  scanResults DlpScanResult[]
+}
+
+model DlpScanResult {
+  id              String   @id @default(cuid())
+  ruleId          String
+  rule            DlpRule  @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  resourceType    String
+  resourceId      String
+  detectedContent String?
+  action          String
+  resolved        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  @@index([ruleId])
+  @@index([resourceType, resourceId])
+}
+
+// #33 — Retention Policies
+model RetentionPolicy {
+  id            String   @id @default(cuid())
+  name          String
+  description   String?
+  resourceType  String // "audit-log" | "secret" | "session" | "export"
+  retentionDays Int
+  action        String   @default("delete") // "delete" | "archive" | "anonymize"
+  enabled       Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// #34 — Custom Roles (extending #24 RBAC)
+model RoleScope {
+  id         String   @id @default(cuid())
+  roleId     String
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  scopeType  String // "global" | "group" | "vault"
+  scopeValue String?
+  createdAt  DateTime @default(now())
+
+  @@unique([roleId, scopeType, scopeValue])
+  @@index([roleId])
+}
+
+model RolePermissionOverride {
+  id            String   @id @default(cuid())
+  roleId        String
+  role          Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionKey String // "admin-panel" | "export" | "manage-users" | "manage-policies"
+  granted       Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  @@unique([roleId, permissionKey])
+  @@index([roleId])
+}
+
+// #35 — Directory Sync (cloud directories)
+model DirectorySyncConfig {
+  id              String    @id @default(cuid())
+  provider        String // "azure-ad" | "google-workspace" | "okta" | "onelogin"
+  name            String
+  clientId        String
+  clientSecret    String
+  tenantId        String?
+  domain          String?
+  syncIntervalSec Int       @default(3600)
+  enabled         Boolean   @default(true)
+  lastSyncAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  syncLogs DirectorySyncLog[]
+}
+
+model DirectorySyncLog {
+  id               String              @id @default(cuid())
+  configId         String
+  config           DirectorySyncConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  status           String // "success" | "partial" | "failed"
+  usersCreated     Int                 @default(0)
+  usersUpdated     Int                 @default(0)
+  usersDeactivated Int                 @default(0)
+  groupsSynced     Int                 @default(0)
+  errorMessage     String?
+  startedAt        DateTime
+  completedAt      DateTime?
+  createdAt        DateTime            @default(now())
+
+  @@index([configId])
+  @@index([status])
+}
+
+// #36 — SLA Monitoring
+model UptimeMonitor {
+  id             String   @id @default(cuid())
+  name           String
+  endpoint       String
+  method         String   @default("GET")
+  expectedStatus Int      @default(200)
+  intervalSec    Int      @default(300)
+  timeoutMs      Int      @default(10000)
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  healthChecks HealthCheckLog[]
+}
+
+model HealthCheckLog {
+  id             String        @id @default(cuid())
+  monitorId      String
+  monitor        UptimeMonitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  status         String // "up" | "down" | "degraded"
+  statusCode     Int?
+  responseTimeMs Int?
+  errorMessage   String?
+  checkedAt      DateTime      @default(now())
+
+  @@index([monitorId, checkedAt])
+  @@index([status])
+}
+
+// #37 — Multitenant
+model Tenant {
+  id         String   @id @default(cuid())
+  name       String
+  slug       String   @unique
+  domain     String?  @unique
+  plan       String   @default("enterprise") // "starter" | "business" | "enterprise"
+  status     String   @default("active") // "active" | "suspended" | "cancelled"
+  maxUsers   Int      @default(100)
+  maxSecrets Int      @default(1000)
+  features   String? // JSON — feature flags
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  branding TenantBranding?
+}
+
+// #38 — Tenant Branding
+model TenantBranding {
+  id             String   @id @default(cuid())
+  tenantId       String   @unique
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  logoUrl        String?
+  faviconUrl     String?
+  primaryColor   String   @default("#2563eb")
+  secondaryColor String?  @default("#1e40af")
+  accentColor    String?  @default("#10b981")
+  companyName    String?
+  supportUrl     String?
+  supportEmail   String?
+  customCss      String?
+  loginMessage   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// #39 — Admin API Keys
+model ApiKey {
+  id          String    @id @default(cuid())
+  name        String
+  keyPrefix   String
+  keyHash     String    @unique
+  permissions String // JSON array
+  createdById String?
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  enabled     Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([keyPrefix])
+}
+
+// #40 — Self-Service Portal / User Action Tokens
+model UserActionToken {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  action    String // "email-verify" | "password-reset" | "device-approve" | "recovery-enable" | "account-recover"
+  payload   String? // JSON
+  status    String    @default("pending") // "pending" | "used" | "expired" | "revoked"
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@index([userId, action])
+  @@index([token])
+  @@index([status, expiresAt])
+}
+
+// =====================================================================
+// Collaboration Feature Models (#41–#52)
+// =====================================================================
+
+// #41 — One-Time Share
+// Crea un link de un solo uso (o N usos máx) para compartir un secreto.
+// El token es un identificador opaco; al canjearlo, el servidor entrega
+// la wrappedSymmetricKey y marca el uso. Una vez alcanzado maxViews, se
+// invalida.
+model OneTimeShare {
+  id                  String    @id @default(cuid())
+  secretId            String
+  ownerId             String
+  token               String    @unique
+  wrappedSymmetricKey String
+  maxViews            Int       @default(1)
+  currentViews        Int       @default(0)
+  expiresAt           DateTime
+  status              String    @default("active") // active | claimed | expired
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([token])
+  @@index([ownerId])
+  @@index([status, expiresAt])
+}
+
+// #42 — Temporary Vault
+// Vault efímero que expira automáticamente. Pensado para integraciones
+// temporales o equipos externos con acceso limitado en el tiempo.
+model TempVault {
+  id            String    @id @default(cuid())
+  ownerId       String
+  name          String?
+  encryptedData String? // base64 — el contenido cifrado del vault temporal
+  dataIv        String?
+  expiresAt     DateTime
+  status        String    @default("active") // active | expired
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([ownerId])
+  @@index([status, expiresAt])
+}
+
+// #43 — Secret Version History
+// Cada versión almacena una foto completa del secreto (cifrado) en ese
+// momento. encryptedDiff (opcional) es un diff cifrado que el cliente
+// puede calcular para mostrar cambios. El servidor nunca ve el contenido.
+model SecretVersion {
+  id              String   @id @default(cuid())
+  secretId        String
+  versionNumber   Int
+  encryptedData   String // base64 — AES-256-GCM
+  dataIv          String // base64
+  encryptedTitle  String? // base64 — puede cambiar entre versiones
+  titleIv         String?
+  encryptedDiff   String? // base64 — diff cifrado opcional
+  diffIv          String?
+  createdBy       String   // userId
+  changelog       String? // metadata: "Rotación de contraseña", "Actualización de URL", etc.
+  createdAt       DateTime @default(now())
+
+  @@unique([secretId, versionNumber])
+  @@index([secretId, createdAt])
+}
+
+// #44 — Comment / Annotation
+// Comentarios sobre un secreto. El contenido puede ir cifrado o en
+// claro (depende del policy). mentions (JSON array) almacena los
+// userIds mencionados con @ para notificaciones.
+model Comment {
+  id        String   @id @default(cuid())
+  secretId  String
+  authorId  String
+  content   String // puede ir cifrado (base64 AES-GCM) si el policy lo exige
+  contentIv String? // IV si content está cifrado
+  mentions  String? // JSON array: ["userId1", "userId2"]
+  parentId  String? // ID del comentario padre (para replies en hilo)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([secretId, createdAt])
+  @@index([authorId])
+}
+
+// #45 — Notification
+// Notificaciones push/SSE para eventos en tiempo real.
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String // "share" | "comment" | "access-request" | "approval" | "system"
+  title     String
+  body      String?
+  data      String? // JSON payload
+  read      Boolean   @default(false)
+  createdAt DateTime  @default(now())
+
+  @@index([userId, read, createdAt])
+  @@index([userId, createdAt])
+}
+
+// #46 — Activity Event
+// Feed de actividad del usuario: acciones realizadas sobre recursos.
+model ActivityEvent {
+  id           String   @id @default(cuid())
+  userId       String
+  action       String // "create" | "share" | "view" | "edit" | "delete" | "comment" | "import" | "export"
+  resourceType String // "secret" | "vault" | "share" | "comment"
+  resourceId   String?
+  metadata     String? // JSON — detalles adicionales
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([resourceType, resourceId])
+}
+
+// #47 — Pre-Approval Sharing
+// Flujo: Alice solicita aprobación para compartir con Bob, un approver
+// (ej. manager) aprueba o rechaza. Si aprueba, la wrappedSymmetricKey
+// se entrega al destinatario.
+model ShareApproval {
+  id                  String    @id @default(cuid())
+  secretId            String
+  requesterId         String
+  approverId          String
+  recipientId         String?
+  reason              String?
+  status              String    @default("pending") // pending | approved | rejected | cancelled
+  wrappedSymmetricKey String? // se asigna al aprobar
+  approverComment     String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([secretId])
+  @@index([approverId, status])
+  @@index([requesterId])
+}
+
+// #48 — Tags & Favorites
+// Tags para organizar y buscar secretos. Relación N:M entre Secret y Tag.
+model Tag {
+  id           String      @id @default(cuid())
+  name         String      @unique
+  color        String?     @default("#6366f1")
+  favorite     Boolean     @default(false) // si es un tag de favoritos o tag normal
+  createdBy    String?
+  createdAt    DateTime    @default(now())
+
+  secretTags   SecretTag[]
+}
+
+model SecretTag {
+  id        String   @id @default(cuid())
+  secretId  String
+  tagId     String
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([secretId, tagId])
+  @@index([secretId])
+  @@index([tagId])
+}
+
+// #49 — Import/Export Log
+// Registro de operaciones de importación/exportación de contraseñas.
+model ImportExportLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String // "import" | "export"
+  source    String? // "bitwarden" | "1password" | "dashlane" | "lastpass" | "manual"
+  format    String   @default("csv")
+  itemCount Int      @default(0)
+  status    String   @default("completed") // completed | failed
+  errorMsg  String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// #50 — Email Share (Magic Link)
+// Compartir un secreto vía email. El destinatario recibe un magic link
+// con un token. Al abrirlo, si el destinatario tiene cuenta, puede
+// reclamar el share. Si no, se le invita a registrarse.
+model EmailShare {
+  id                  String    @id @default(cuid())
+  secretId            String
+  senderId            String
+  recipientEmail      String
+  token               String    @unique
+  wrappedSymmetricKey String? // se asigna cuando el destinatario reclama
+  message             String? // mensaje opcional del remitente
+  status              String    @default("pending") // pending | sent | claimed | expired
+  expiresAt           DateTime
+  claimedAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([token])
+  @@index([recipientEmail])
+  @@index([senderId])
+}
+
+// #51 — Access Request
+// Un usuario solicita acceso a un secreto que no le pertenece.
+// El owner del secreto puede aprobar o denegar.
+model AccessRequest {
+  id              String    @id @default(cuid())
+  secretId        String
+  requesterId     String
+  requester       User      @relation(fields: [requesterId], references: [id], onDelete: Cascade)
+  reason          String?
+  status          String    @default("pending") // pending | approved | denied
+  approverId      String?
+  approverComment String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([secretId, status])
+  @@index([requesterId, status])
+}
+
+// #52 — Share Audit Event
+// Registro detallado de cada acción sobre shares: quién, qué, cuándo.
+model ShareAuditEvent {
+  id        String   @id @default(cuid())
+  secretId  String
+  actorId   String
+  action    String // "share" | "revoke" | "view" | "claim" | "approve" | "deny" | "request" | "email-share"
+  targetId  String? // userId del destinatario o email
+  metadata  String? // JSON — detalles adicionales
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([secretId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+}
+
+----- fin del archivo -----
+
+
+================================================================================
+  CRYPTO CLIENT: src/lib/crypto-client.ts
+================================================================================
+  Ruta original:  src/lib/crypto-client.ts
+  Tamano:         54236 bytes
+  Lineas:         1600
+================================================================================
+----- inicio del archivo -----
+
+/**
+ * =====================================================================
+ * crypto-client.ts — Primitivas criptográficas del lado del CLIENTE.
+ * =====================================================================
+ * Todo el cifrado ocurre en el navegador mediante Web Crypto API.
+ * El servidor NUNCA recibe:
+ *   - La contraseña maestra
+ *   - La llave maestra derivada (PBKDF2)
+ *   - La llave privada RSA en claro
+ *   - La llave simétrica AES en claro
+ *
+ * Esquema criptográfico:
+ *   - KDF:        PBKDF2-SHA256, 600.000 iteraciones, salt aleatorio
+ *   - Simétrico:  AES-256-GCM (12-byte IV)
+ *   - Asimétrico: RSA-OAEP 2048-bit, SHA-256 (hash), SHA-1 (label/MGF1)
+ *                 — algoritmo soportado universalmente por Web Crypto
+ *   - Wrapping:   RSA-OAEP wrap de la llave AES cruda
+ * =====================================================================
+ */
+
+// ---------------------------------------------------------------------------
+// Constantes criptográficas
+// ---------------------------------------------------------------------------
+// KDF — Argon2id (preferido) + PBKDF2 (legacy fallback)
+//   Argon2id parámetros OWASP 2024:
+//     m (memory) = 64 MiB = 65536 KiB
+//     t (iterations) = 3
+//     p (parallelism) = 4
+//   PBKDF2 parámetros legacy (cuentas creadas antes de la migración):
+//     iterations = 600.000, SHA-256
+export type KdfAlgorithm = "argon2id" | "pbkdf2";
+
+export const ARGON2_MEMORY_KIB = 65_536; // 64 MiB
+export const ARGON2_ITERATIONS = 3;
+export const ARGON2_PARALLELISM = 4;
+export const ARGON2_SALT_LENGTH = 16; // 128 bits
+
+export const KDF_ITERATIONS = 600_000; // PBKDF2 legacy
+export const KDF_ITERATIONS_MIN = 310_000;
+export const KDF_ITERATIONS_MAX = 1_000_000;
+
+export const SALT_LENGTH = 16; // 128 bits
+export const IV_LENGTH = 12; // 96 bits (recomendado GCM)
+export const RSA_MODULUS = 2048;
+export const AES_KEY_LENGTH = 256;
+export const MAX_BLOB_BYTES = 64 * 1024;
+export const MAX_JWK_BYTES = 4 * 1024;
+
+// ---------------------------------------------------------------------------
+// Helpers de serialización (base64 <-> ArrayBuffer)
+// ---------------------------------------------------------------------------
+export function bufToBase64(buf: ArrayBuffer | Uint8Array): string {
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+export function base64ToBuf(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+export function randomBytes(length: number): Uint8Array {
+  const arr = new Uint8Array(length);
+  crypto.getRandomValues(arr);
+  return arr;
+}
+
+/**
+ * Normaliza una contraseña a Unicode NFC antes de cualquier derivación.
+ * Evita que el mismo password en forma NFC vs NFD produzca llaves maestras
+ * distintas, lo que bloquearía al usuario fuera de su bóveda sin razón
+ * aparente. NFC es la forma preferida por W3C.
+ */
+export function normalizePassword(password: string): string {
+  return password.normalize("NFC");
+}
+
+/**
+ * Canonicaliza una JWK para que su hash sea determinista independientemente
+ * del orden de claves o de espacios en blanco. Devuelve un JSON con claves
+ * ordenadas alfabéticamente y sin espacios.
+ *
+ * Se eliminan los campos `key_ops`, `ext` y `alg` antes de canonicalizar
+ * porque son metadatos de uso, no parte de la key material. Dos JWKs
+ * representando el mismo par RSA pero con distintos `alg` (RSA-OAEP-256
+ * vs RSA-OAEP) deben producir la misma fingerprint.
+ */
+export function canonicalJwkString(jwk: JsonWebKey): string {
+  const {
+    key_ops: _kops,
+    ext: _ext,
+    alg: _alg,
+    ...material
+  } = jwk;
+  const sorted: Record<string, unknown> = {};
+  for (const k of Object.keys(material).sort()) {
+    sorted[k] = (material as Record<string, unknown>)[k];
+  }
+  return JSON.stringify(sorted);
+}
+
+/**
+ * Huella criptográfica de una llave pública (SHA-256 del JWK canonizado).
+ * Se usa para:
+ *  - TOFU: el cliente muestra esta huella al compartir, el owner la verifica
+ *    fuera de banda con el destinatario.
+ *  - Detección de sustitución: si la huella cambia entre dos lookups,
+ *    el cliente alerta al usuario.
+ */
+export async function publicKeyFingerprint(jwk: JsonWebKey): Promise<string> {
+  const canon = canonicalJwkString(jwk);
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canon));
+  const bytes = new Uint8Array(hash);
+  let hex = "";
+  for (let i = 0; i < bytes.length; i++) {
+    hex += bytes[i].toString(16).padStart(2, "0");
+  }
+  return hex;
+}
+
+// ---------------------------------------------------------------------------
+// 1. KDF — Derivar llave maestra desde contraseña + salt
+// ---------------------------------------------------------------------------
+/**
+ * Deriva una CryptoKey AES-256-GCM a partir de la contraseña del usuario.
+ *
+ * MEJORA Fase 2: soporta Argon2id (preferido, memory-hard) Y PBKDF2
+ * (legacy, para cuentas creadas antes de la migración). El algoritmo
+ * se selecciona con `algorithm` y los parámetros vienen en `params`.
+ *
+ * Argon2id se ejecuta en un Web Worker para no bloquear la UI mientras
+ * consume 64 MiB de RAM durante ~1-2s.
+ *
+ * Esta llave NUNCA sale del navegador.
+ */
+export interface KdfParams {
+  algorithm: KdfAlgorithm;
+  salt: Uint8Array;
+  // PBKDF2:
+  iterations?: number;
+  // Argon2id:
+  memoryKiB?: number;
+  argon2Iterations?: number;
+  parallelism?: number;
+}
+
+let _argonWorker: Worker | null = null;
+let _argonWorkerRequestId = 0;
+
+function getArgonWorker(): Worker {
+  if (_argonWorker) return _argonWorker;
+  // Crear el Web Worker para Argon2id.
+  // Next.js/Turbopack empaqueta el worker automáticamente con esta sintaxis.
+  // Si el worker falla al cargar, la función argon2HashInWorker captura
+  // el error y derivará a PBKDF2 como fallback.
+  try {
+    _argonWorker = new Worker(new URL("./argon2-worker.ts", import.meta.url));
+    // Manejar errores no capturados del worker
+    _argonWorker.onerror = (e) => {
+      console.error("[argon2-worker] Error no capturado:", e.message);
+      _argonWorker = null; // Reset para permitir reintento
+    };
+    return _argonWorker;
+  } catch (err) {
+    console.warn("[argon2] No se pudo crear Worker, fallback a PBKDF2:", err);
+    throw new Error("Argon2id worker no disponible");
+  }
+}
+
+function argon2HashInWorker(params: {
+  password: string;
+  salt: Uint8Array;
+  memoryKiB: number;
+  iterations: number;
+  parallelism: number;
+}): Promise<ArrayBuffer> {
+  return new Promise((resolve, reject) => {
+    const worker = getArgonWorker();
+    const id = ++_argonWorkerRequestId;
+    const handler = (e: MessageEvent) => {
+      const resp = e.data;
+      if (resp.id !== id) return; // no es nuestra respuesta
+      worker.removeEventListener("message", handler);
+      if (resp.ok && resp.rawKey) {
+        resolve(resp.rawKey);
+      } else {
+        reject(new Error(resp.error ?? "Argon2id failed"));
+      }
+    };
+    worker.addEventListener("message", handler);
+    // Copiar el salt porque será transferido al worker
+    const saltCopy = new Uint8Array(params.salt);
+    worker.postMessage(
+      {
+        id,
+        password: params.password,
+        salt: saltCopy,
+        memoryKiB: params.memoryKiB,
+        iterations: params.iterations,
+        parallelism: params.parallelism,
+      },
+      [saltCopy.buffer],
+    );
+  });
+}
+
+export async function deriveMasterKey(
+  password: string,
+  params: KdfParams,
+): Promise<CryptoKey> {
+  const normalized = normalizePassword(password);
+
+  if (params.algorithm === "argon2id") {
+    // Argon2id vía Web Worker.
+    //
+    // IMPORTANTE: NO hacemos fallback silencioso a PBKDF2 aquí. Si el
+    // worker falla, propagamos el error. El llamador decide qué hacer:
+    //   - En REGISTRO: si Argon2id falla, abortar (no registrar con
+    //     algoritmo equivocado).
+    //   - En LOGIN: el servidor ya dijo qué algoritmo se usó al registrar;
+    //     si era argon2id, DEBE usarse argon2id (no se puede cambiar a
+    //     pbkdf2 porque la masterKey sería distinta y el descifrado fallaría).
+    //
+    // El fallback a PBKDF2 solo tiene sentido si el usuario tiene una
+    // cuenta legacy (kdfAlgorithm="pbkdf2" en BD), en cuyo caso
+    // params.algorithm === "pbkdf2" y este bloque no se ejecuta.
+    const rawKey = await argon2HashInWorker({
+      password: normalized,
+      salt: params.salt,
+      memoryKiB: params.memoryKiB ?? ARGON2_MEMORY_KIB,
+      iterations: params.argon2Iterations ?? ARGON2_ITERATIONS,
+      parallelism: params.parallelism ?? ARGON2_PARALLELISM,
+    });
+    return crypto.subtle.importKey(
+      "raw",
+      rawKey,
+      { name: "AES-GCM", length: AES_KEY_LENGTH },
+      false,
+      ["encrypt", "decrypt"],
+    );
+  }
+
+  // PBKDF2 (legacy o explícito)
+  const passwordKey = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(normalized),
+    { name: "PBKDF2" },
+    false,
+    ["deriveKey"],
+  );
+  return crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: params.salt as BufferSource,
+      iterations: params.iterations ?? KDF_ITERATIONS,
+      hash: "SHA-256",
+    },
+    passwordKey,
+    { name: "AES-GCM", length: AES_KEY_LENGTH },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+// Convenience: construir KdfParams para Argon2id con valores por defecto
+export function argon2DefaultParams(salt: Uint8Array): KdfParams {
+  return {
+    algorithm: "argon2id",
+    salt,
+    memoryKiB: ARGON2_MEMORY_KIB,
+    argon2Iterations: ARGON2_ITERATIONS,
+    parallelism: ARGON2_PARALLELISM,
+  };
+}
+
+// Convenience: construir KdfParams PBKDF2 legacy
+export function pbkdf2LegacyParams(
+  salt: Uint8Array,
+  iterations: number,
+): KdfParams {
+  return {
+    algorithm: "pbkdf2",
+    salt,
+    iterations,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 2. AES-256-GCM helpers (para cifrar blobs genéricos)
+// ---------------------------------------------------------------------------
+export async function aesEncrypt(
+  key: CryptoKey,
+  plaintext: string,
+): Promise<{ ciphertext: string; iv: string }> {
+  const iv = randomBytes(IV_LENGTH);
+  const ct = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: iv as BufferSource },
+    key,
+    new TextEncoder().encode(plaintext),
+  );
+  return { ciphertext: bufToBase64(ct), iv: bufToBase64(iv) };
+}
+
+export async function aesDecrypt(
+  key: CryptoKey,
+  ciphertextB64: string,
+  ivB64: string,
+): Promise<string> {
+  const ctBuf = base64ToBuf(ciphertextB64);
+  const ivBuf = base64ToBuf(ivB64);
+  const pt = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: ivBuf as BufferSource },
+    key,
+    ctBuf as BufferSource,
+  );
+  zeroBuffer(ctBuf);
+  zeroBuffer(ivBuf);
+  return new TextDecoder().decode(pt);
+}
+
+// ---------------------------------------------------------------------------
+// 3. RSA-OAEP + RSA-PSS — Par asimétrico dual-purpose
+//    - RSA-OAEP: cifrado / wrapping de llaves AES
+//    - RSA-PSS:  firma de prueba-de-posesión (PoP) en el registro
+// ---------------------------------------------------------------------------
+/**
+ * Genera el par RSA-OAEP. Web Crypto NO permite combinar `sign`/`verify`
+ * con `encrypt`/`decrypt` en una sola generateKey() para RSA-OAEP, así
+ * que generamos solo los usos de cifrado aquí. La firma PoP se realiza
+ * re-importando la JWK privada como RSA-PSS (ver signPop más abajo),
+ * usando la misma key material.
+ *
+ * Esto es válido porque matemáticamente un par RSA es el mismo par de
+ * enteros (n, e, d) independientemente del padding usado en una
+ * operación concreta. La restricción de Web Crypto es solo de API.
+ */
+export async function generateRsaKeyPair(): Promise<CryptoKeyPair> {
+  return crypto.subtle.generateKey(
+    {
+      name: "RSA-OAEP",
+      modulusLength: RSA_MODULUS,
+      publicExponent: new Uint8Array([1, 0, 1]), // 65537
+      hash: "SHA-256",
+    },
+    true, // extraíble: necesitamos exportar la llave privada para cifrarla
+    ["encrypt", "decrypt", "wrapKey", "unwrapKey"],
+  );
+}
+
+export async function exportPublicKeyJwk(key: CryptoKey): Promise<JsonWebKey> {
+  return crypto.subtle.exportKey("jwk", key);
+}
+
+export async function exportPrivateKeyJwk(key: CryptoKey): Promise<JsonWebKey> {
+  return crypto.subtle.exportKey("jwk", key);
+}
+
+/**
+ * Limpia campos opcionales de la JWK que pueden causar inconsistencias
+ * con el parámetro `usages` o el algoritmo de importKey.
+ * Específicamente:
+ *   - key_ops: debe ser superconjunto de los usos solicitados.
+ *   - ext: debe coincidir con el flag extractable solicitado.
+ *   - alg: si está presente, debe coincidir con el algoritmo de importKey.
+ *     Como usamos la misma JWK para RSA-OAEP y RSA-PSS, eliminamos alg
+ *     para evitar el mismatch.
+ */
+function sanitizeJwk(jwk: JsonWebKey): JsonWebKey {
+  const {
+    key_ops: _ignoredKeyOps,
+    ext: _ignoredExt,
+    alg: _ignoredAlg,
+    ...rest
+  } = jwk;
+  return rest;
+}
+
+export async function importPublicKeyJwk(jwk: JsonWebKey): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    "jwk",
+    sanitizeJwk(jwk),
+    // Solo RSA-OAEP para wrapping de llaves AES.
+    // La verificación PoP se hace en el servidor (no aquí).
+    // Si en el futuro el cliente necesita verificar PoP, se importará
+    // por separado como RSA-PSS.
+    { name: "RSA-OAEP", hash: "SHA-256" },
+    true,
+    ["encrypt", "wrapKey"],
+  );
+}
+
+export async function importPrivateKeyJwk(jwk: JsonWebKey): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    "jwk",
+    sanitizeJwk(jwk),
+    // Solo RSA-OAEP para unwrap de llaves AES.
+    // La firma PoP se hace re-importando la JWK como RSA-PSS en signPop.
+    { name: "RSA-OAEP", hash: "SHA-256" },
+    false, // no extraíble: la llave privada en memoria no debe poder exportarse de nuevo
+    ["decrypt", "unwrapKey"],
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 4. Cifrar / descifrar la llave privada RSA con la llave maestra
+// ---------------------------------------------------------------------------
+export interface EncryptedPrivateKey {
+  encryptedJwk: string; // base64
+  iv: string; // base64
+}
+
+export async function encryptPrivateKey(
+  masterKey: CryptoKey,
+  privateKey: CryptoKey,
+): Promise<EncryptedPrivateKey> {
+  const jwk = await exportPrivateKeyJwk(privateKey);
+  const jwkStr = JSON.stringify(jwk);
+  const { ciphertext, iv } = await aesEncrypt(masterKey, jwkStr);
+  return { encryptedJwk: ciphertext, iv };
+}
+
+export async function decryptPrivateKey(
+  masterKey: CryptoKey,
+  encryptedJwkB64: string,
+  ivB64: string,
+): Promise<CryptoKey> {
+  const jwkStr = await aesDecrypt(masterKey, encryptedJwkB64, ivB64);
+  const jwk = JSON.parse(jwkStr) as JsonWebKey;
+  const key = await importPrivateKeyJwk(jwk);
+  // Zero the JWK string and parsed object after import
+  zeroBuffer(new TextEncoder().encode(jwkStr));
+  for (const k of Object.keys(jwk)) {
+    (jwk as any)[k] = "";
+  }
+  return key;
+}
+
+// ---------------------------------------------------------------------------
+// 4.b Proof-of-Possession (PoP) — firma RSA-PSS que demuestra que el
+//     cliente realmente posee la privateKey correspondiente a la publicKey
+//     que está registrando. El servidor verifica esta firma antes de
+//     aceptar el registro, previniendo sustitución de publicKey.
+// ---------------------------------------------------------------------------
+/**
+ * Construye el mensaje canónico que se firma para PoP.
+ * Incluye email + fingerprint + kdfSalt para vincular la identidad del
+ * usuario con su par de llaves y su salt de derivación.
+ */
+export function buildPopMessage(
+  email: string,
+  fingerprintHex: string,
+  kdfSaltB64: string,
+): Uint8Array {
+  // Formato determinista: campo=valor separados por \n
+  const msg = `zk-vault-pop-v1\nemail=${email}\nfingerprint=${fingerprintHex}\nsalt=${kdfSaltB64}`;
+  return new TextEncoder().encode(msg);
+}
+
+/**
+ * Firma el mensaje PoP con RSA-PSS (salt length = 32 bytes).
+ * Devuelve la firma en base64.
+ *
+ * IMPORTANTE: Web Crypto no permite usar la misma CryptoKey para
+ * RSA-OAEP (decrypt) y RSA-PSS (sign) simultáneamente. Por eso
+ * exportamos la privateKey a JWK y la re-importamos como RSA-PSS
+ * con uso `sign`. Es la misma key material (mismos enteros n, d),
+ * solo cambia el algoritmo de padding aplicado en esta operación.
+ */
+export async function signPop(
+  privateKey: CryptoKey,
+  email: string,
+  fingerprintHex: string,
+  kdfSaltB64: string,
+): Promise<string> {
+  // 1. Exportar la privateKey a JWK (es extraíble por diseño en generateKey)
+  const jwk = await exportPrivateKeyJwk(privateKey);
+
+  // 2. Re-importar como RSA-PSS con uso `sign`
+  const signingKey = await crypto.subtle.importKey(
+    "jwk",
+    sanitizeJwk(jwk),
+    { name: "RSA-PSS", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+
+  // 3. Firmar
+  const msg = buildPopMessage(email, fingerprintHex, kdfSaltB64);
+  const sig = await crypto.subtle.sign(
+    { name: "RSA-PSS", saltLength: 32 },
+    signingKey,
+    msg as BufferSource,
+  );
+  return bufToBase64(sig);
+}
+
+/**
+ * Verifica una firma PoP con la publicKey declarada.
+ * Usado por el servidor en /api/auth/register.
+ */
+export async function verifyPop(
+  publicKey: CryptoKey,
+  signatureB64: string,
+  email: string,
+  fingerprintHex: string,
+  kdfSaltB64: string,
+): Promise<boolean> {
+  try {
+    const msg = buildPopMessage(email, fingerprintHex, kdfSaltB64);
+    return crypto.subtle.verify(
+      { name: "RSA-PSS", saltLength: 32 },
+      publicKey,
+      base64ToBuf(signatureB64) as BufferSource,
+      msg as BufferSource,
+    );
+  } catch {
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 5. AES-256-GCM para cifrar el contenido de los secretos
+// ---------------------------------------------------------------------------
+export async function generateAesKey(): Promise<CryptoKey> {
+  return crypto.subtle.generateKey(
+    { name: "AES-GCM", length: AES_KEY_LENGTH },
+    true, // extraíble: necesitamos exportar el raw para wrap con RSA
+    ["encrypt", "decrypt"],
+  );
+}
+
+export async function exportAesKeyRaw(key: CryptoKey): Promise<ArrayBuffer> {
+  return crypto.subtle.exportKey("raw", key);
+}
+
+export async function importAesKeyRaw(raw: ArrayBuffer): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    "raw",
+    raw,
+    { name: "AES-GCM", length: AES_KEY_LENGTH },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 6. Key Wrapping — envolver la llave AES con la llave pública RSA
+// ---------------------------------------------------------------------------
+/**
+ * Envuelve (cifra) la llave simétrica AES con la llave PÚBLICA del
+ * destinatario. Solo quien posea la llave PRIVADA correspondiente
+ * podrá desenvolverla.
+ */
+export async function wrapAesKeyWithRsaPublicKey(
+  aesKey: CryptoKey,
+  recipientPublicKey: CryptoKey,
+): Promise<string> {
+  const rawAes = await exportAesKeyRaw(aesKey);
+  const wrapped = await crypto.subtle.encrypt(
+    { name: "RSA-OAEP" },
+    recipientPublicKey,
+    rawAes,
+  );
+  return bufToBase64(wrapped);
+}
+
+/**
+ * Desenvuelve (descifra) la llave simétrica AES usando la llave
+ * PRIVADA del destinatario.
+ */
+export async function unwrapAesKeyWithRsaPrivateKey(
+  wrappedKeyB64: string,
+  recipientPrivateKey: CryptoKey,
+): Promise<CryptoKey> {
+  const rawAes = await crypto.subtle.decrypt(
+    { name: "RSA-OAEP" },
+    recipientPrivateKey,
+    base64ToBuf(wrappedKeyB64) as BufferSource,
+  );
+  return importAesKeyRaw(rawAes);
+}
+
+// ---------------------------------------------------------------------------
+// 7. Orquestación de alto nivel — Registro
+// ---------------------------------------------------------------------------
+export interface RegistrationArtifacts {
+  kdfAlgorithm: KdfAlgorithm;
+  kdfSalt: string;
+  kdfIterations: number; // Para Argon2id = t (time); para PBKDF2 = iteraciones
+  kdfMemoryKiB?: number; // Argon2id only
+  kdfParallelism?: number; // Argon2id only
+  publicKeyJwk: JsonWebKey;
+  publicKeyFingerprint: string; // hex SHA-256 — para TOFU
+  encryptedPrivateKey: EncryptedPrivateKey;
+  popSignature: string; // base64 RSA-PSS — prueba de posesión
+  // En memoria (NO se envían al servidor):
+  masterKey: CryptoKey;
+  privateKey: CryptoKey;
+  publicKey: CryptoKey;
+}
+
+export async function performRegistration(
+  email: string,
+  password: string,
+): Promise<RegistrationArtifacts> {
+  // 1. Salt aleatorio
+  const salt = randomBytes(SALT_LENGTH);
+
+  // 2. Derivar llave maestra con Argon2id (memory-hard, GPU-resistant).
+  //    Se ejecuta en Web Worker para no bloquear la UI.
+  //
+  //    ESTRATEGIA DE FALLBACK CONSISTENTE:
+  //    - Intentar Argon2id primero.
+  //    - Si el worker falla (WASM no soportado, error de carga), hacer
+  //      fallback a PBKDF2 con iteraciones altas PERO marcar
+  //      kdfAlgorithm="pbkdf2" honestamente (no mentir al servidor).
+  //    - Así el login futuro será consistente: el servidor dirá "pbkdf2"
+  //      y el cliente usará PBKDF2.
+  const PREFER_ARGON2 = true;
+  let masterKey: CryptoKey;
+  let kdfAlgorithm: KdfAlgorithm;
+  let kdfIterationsUsed: number;
+  let kdfMemoryKiBUsed: number | undefined;
+  let kdfParallelismUsed: number | undefined;
+
+  if (PREFER_ARGON2) {
+    try {
+      masterKey = await deriveMasterKey(password, argon2DefaultParams(salt));
+      kdfAlgorithm = "argon2id";
+      kdfIterationsUsed = ARGON2_ITERATIONS;
+      kdfMemoryKiBUsed = ARGON2_MEMORY_KIB;
+      kdfParallelismUsed = ARGON2_PARALLELISM;
+    } catch (err) {
+      console.warn(
+        "[kdf] Argon2id no disponible, fallback HONESTO a PBKDF2. " +
+          "La cuenta se registrará con kdfAlgorithm='pbkdf2'. Error:",
+        err,
+      );
+      masterKey = await deriveMasterKey(
+        password,
+        pbkdf2LegacyParams(salt, KDF_ITERATIONS),
+      );
+      kdfAlgorithm = "pbkdf2";
+      kdfIterationsUsed = KDF_ITERATIONS;
+      kdfMemoryKiBUsed = undefined;
+      kdfParallelismUsed = undefined;
+    }
+  } else {
+    masterKey = await deriveMasterKey(
+      password,
+      pbkdf2LegacyParams(salt, KDF_ITERATIONS),
+    );
+    kdfAlgorithm = "pbkdf2";
+    kdfIterationsUsed = KDF_ITERATIONS;
+    kdfMemoryKiBUsed = undefined;
+    kdfParallelismUsed = undefined;
+  }
+
+  // 3. Generar par RSA-OAEP + RSA-PSS
+  const rsaPair = await generateRsaKeyPair();
+
+  // 4. Cifrar llave privada con llave maestra (AES-256-GCM)
+  const encryptedPrivateKey = await encryptPrivateKey(masterKey, rsaPair.privateKey);
+
+  // 5. Exportar llave pública (en claro, es pública)
+  const publicKeyJwk = await exportPublicKeyJwk(rsaPair.publicKey);
+
+  // 6. Calcular fingerprint de la publicKey para TOFU
+  const kdfSaltB64 = bufToBase64(salt);
+  const fingerprint = await publicKeyFingerprint(publicKeyJwk);
+
+  // 7. Firma PoP
+  const normalizedEmail = email.toLowerCase().trim();
+  const popSignature = await signPop(
+    rsaPair.privateKey,
+    normalizedEmail,
+    fingerprint,
+    kdfSaltB64,
+  );
+
+  return {
+    kdfAlgorithm,
+    kdfSalt: kdfSaltB64,
+    kdfIterations: kdfIterationsUsed,
+    kdfMemoryKiB: kdfMemoryKiBUsed,
+    kdfParallelism: kdfParallelismUsed,
+    publicKeyJwk,
+    publicKeyFingerprint: fingerprint,
+    encryptedPrivateKey,
+    popSignature,
+    masterKey,
+    privateKey: rsaPair.privateKey,
+    publicKey: rsaPair.publicKey,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 8. Orquestación de alto nivel — Login
+// ---------------------------------------------------------------------------
+export interface LoginArtifacts {
+  masterKey: CryptoKey;
+  privateKey: CryptoKey;
+}
+
+/**
+ * Login que soporta tanto Argon2id (nuevo) como PBKDF2 (legacy).
+ * El servidor devuelve el algoritmo usado en el registro; el cliente
+ * aplica el mismo para derivar la masterKey.
+ */
+export async function performLogin(params: {
+  password: string;
+  kdfAlgorithm: KdfAlgorithm;
+  kdfSaltB64: string;
+  kdfIterations: number;
+  kdfMemoryKiB?: number;
+  kdfParallelism?: number;
+  encryptedPrivateKeyJwkB64: string;
+  privateKeyIvB64: string;
+}): Promise<LoginArtifacts> {
+  const {
+    password,
+    kdfAlgorithm,
+    kdfSaltB64,
+    kdfIterations,
+    kdfMemoryKiB,
+    kdfParallelism,
+    encryptedPrivateKeyJwkB64,
+    privateKeyIvB64,
+  } = params;
+
+  const salt = base64ToBuf(kdfSaltB64);
+  const kdfParams: KdfParams =
+    kdfAlgorithm === "argon2id"
+      ? {
+          algorithm: "argon2id",
+          salt,
+          memoryKiB: kdfMemoryKiB ?? ARGON2_MEMORY_KIB,
+          argon2Iterations: kdfIterations,
+          parallelism: kdfParallelism ?? ARGON2_PARALLELISM,
+        }
+      : {
+          algorithm: "pbkdf2",
+          salt,
+          iterations: kdfIterations,
+        };
+
+  const masterKey = await deriveMasterKey(password, kdfParams);
+  const privateKey = await decryptPrivateKey(
+    masterKey,
+    encryptedPrivateKeyJwkB64,
+    privateKeyIvB64,
+  );
+  return { masterKey, privateKey };
+}
+
+// ---------------------------------------------------------------------------
+// 9. Orquestación de alto nivel — Crear secreto
+// ---------------------------------------------------------------------------
+export interface SecretArtifacts {
+  encryptedTitle: string;
+  titleIv: string;
+  encryptedData: string;
+  dataIv: string;
+  aesKey: CryptoKey; // en memoria
+  wrappedKeyForOwner: string; // AES key wrapped con la llave pública del owner
+}
+
+export async function encryptNewSecret(
+  title: string,
+  content: string,
+  ownerPublicKey: CryptoKey,
+): Promise<SecretArtifacts> {
+  const aesKey = await generateAesKey();
+
+  const { ciphertext: encryptedTitle, iv: titleIv } = await aesEncrypt(aesKey, title);
+  const { ciphertext: encryptedData, iv: dataIv } = await aesEncrypt(aesKey, content);
+
+  const wrappedKeyForOwner = await wrapAesKeyWithRsaPublicKey(aesKey, ownerPublicKey);
+
+  return { encryptedTitle, titleIv, encryptedData, dataIv, aesKey, wrappedKeyForOwner };
+}
+
+// ---------------------------------------------------------------------------
+// 10. Orquestación de alto nivel — Leer secreto
+// ---------------------------------------------------------------------------
+export async function decryptSecret(
+  wrappedKeyB64: string,
+  encryptedTitle: string,
+  titleIv: string,
+  encryptedData: string,
+  dataIv: string,
+  recipientPrivateKey: CryptoKey,
+): Promise<{ title: string; content: string; aesKey: CryptoKey }> {
+  const aesKey = await unwrapAesKeyWithRsaPrivateKey(wrappedKeyB64, recipientPrivateKey);
+  const title = await aesDecrypt(aesKey, encryptedTitle, titleIv);
+  const content = await aesDecrypt(aesKey, encryptedData, dataIv);
+  return { title, content, aesKey };
+}
+
+// ---------------------------------------------------------------------------
+// 11. Orquestación de alto nivel — Compartir secreto
+// ---------------------------------------------------------------------------
+/**
+ * Toma la llave AES del secreto (envuelta con la publicKey del owner)
+ * y la re-envuelve con la publicKey del destinatario.
+ *
+ * Implementación: operamos directamente con los BYTES RAW de la AES key
+ * (sin pasar por importKey/exportKey) para evitar restricciones de
+ * extraibilidad. Esto es seguro porque los raw bytes nunca salen del
+ * navegador: se descifran con la privateKey del owner y se re-cifran
+ * inmediatamente con la publicKey del destinatario, todo en memoria.
+ */
+export async function shareSecretWithRecipient(
+  ownerWrappedKeyB64: string,
+  ownerPrivateKey: CryptoKey,
+  recipientPublicKey: CryptoKey,
+): Promise<string> {
+  const wrappedBuf = base64ToBuf(ownerWrappedKeyB64);
+  const rawAesBytes = await crypto.subtle.decrypt(
+    { name: "RSA-OAEP" },
+    ownerPrivateKey,
+    wrappedBuf as BufferSource,
+  );
+  zeroBuffer(wrappedBuf);
+
+  const rewrapped = await crypto.subtle.encrypt(
+    { name: "RSA-OAEP" },
+    recipientPublicKey,
+    rawAesBytes,
+  );
+  zeroBuffer(new Uint8Array(rawAesBytes));
+
+  return bufToBase64(rewrapped);
+}
+
+// ---------------------------------------------------------------------------
+// 12. Orquestación de alto nivel — Rotación de contraseña maestra
+// ---------------------------------------------------------------------------
+/**
+ * Rotación de contraseña maestra.
+ *
+ * Cliente debe proporcionar:
+ *   - oldPassword: para descifrar la privateKey actual y verificar que
+ *     el usuario legítimo es quien rota (no un atacante con sesión abierta).
+ *   - newPassword: la nueva contraseña maestra.
+ *   - Los artifacts del login actual (salt, iterations, encryptedPrivateKey,
+ *     iv) para descifrar la privateKey.
+ *
+ * Salida: artifacts listos para enviar al servidor:
+ *   - newKdfSalt, newKdfIterations
+ *   - newEncryptedPrivateKey (la MISMA privateKey, re-cifrada con la nueva
+ *     masterKey)
+ *   - newPopSignature (firma sobre el nuevo salt, con la misma privateKey)
+ *
+ * CRÍTICO: la privateKey RSA NO cambia. Por tanto:
+ *   - Las wrappedKeys existentes siguen siendo válidas.
+ *   - Los shares existentes siguen funcionando.
+ *   - Solo cambia el "candado" (masterKey) que protege la privateKey en BD.
+ *
+ * Si el atacante tiene la masterKey VIEJA pero el usuario rota antes de que
+ * el atacante obtenga la BD, la masterKey vieja ya no sirve para nada.
+ */
+export interface RotationArtifacts {
+  newKdfAlgorithm: KdfAlgorithm;
+  newKdfSalt: string;
+  newKdfIterations: number;
+  newKdfMemoryKiB?: number;
+  newKdfParallelism?: number;
+  newEncryptedPrivateKey: EncryptedPrivateKey;
+  newPopSignature: string;
+  // En memoria (actualizar el store):
+  newMasterKey: CryptoKey;
+}
+
+export async function performPasswordRotation(params: {
+  oldPassword: string;
+  newPassword: string;
+  email: string;
+  currentKdfAlgorithm: KdfAlgorithm;
+  currentKdfSaltB64: string;
+  currentKdfIterations: number;
+  currentKdfMemoryKiB?: number;
+  currentKdfParallelism?: number;
+  currentEncryptedPrivateKeyJwkB64: string;
+  currentPrivateKeyIvB64: string;
+}): Promise<RotationArtifacts> {
+  const {
+    oldPassword,
+    newPassword,
+    email,
+    currentKdfAlgorithm,
+    currentKdfSaltB64,
+    currentKdfIterations,
+    currentKdfMemoryKiB,
+    currentKdfParallelism,
+    currentEncryptedPrivateKeyJwkB64,
+    currentPrivateKeyIvB64,
+  } = params;
+
+  // 1. Descifrar la privateKey JWK con la contraseña VIEJA.
+  //    Usamos el algoritmo declarado en el registro (Argon2id o PBKDF2 legacy).
+  const oldKdfParams: KdfParams =
+    currentKdfAlgorithm === "argon2id"
+      ? {
+          algorithm: "argon2id",
+          salt: base64ToBuf(currentKdfSaltB64),
+          memoryKiB: currentKdfMemoryKiB ?? ARGON2_MEMORY_KIB,
+          argon2Iterations: currentKdfIterations,
+          parallelism: currentKdfParallelism ?? ARGON2_PARALLELISM,
+        }
+      : {
+          algorithm: "pbkdf2",
+          salt: base64ToBuf(currentKdfSaltB64),
+          iterations: currentKdfIterations,
+        };
+
+  const oldMasterKey = await deriveMasterKey(oldPassword, oldKdfParams);
+  const privateKeyJwkStr = await aesDecrypt(
+    oldMasterKey,
+    currentEncryptedPrivateKeyJwkB64,
+    currentPrivateKeyIvB64,
+  );
+  const privateKeyJwk = JSON.parse(privateKeyJwkStr) as JsonWebKey;
+
+  // 2. Generar nuevo salt y derivar nueva masterKey.
+  //    Misma estrategia de fallback consistente que el registro.
+  const PREFER_ARGON2 = true;
+  const newSalt = randomBytes(SALT_LENGTH);
+  let newMasterKey: CryptoKey;
+  let newKdfAlgorithm: KdfAlgorithm;
+  let newKdfIterations: number;
+  let newKdfMemoryKiB: number | undefined;
+  let newKdfParallelism: number | undefined;
+
+  if (PREFER_ARGON2) {
+    try {
+      newMasterKey = await deriveMasterKey(newPassword, argon2DefaultParams(newSalt));
+      newKdfAlgorithm = "argon2id";
+      newKdfIterations = ARGON2_ITERATIONS;
+      newKdfMemoryKiB = ARGON2_MEMORY_KIB;
+      newKdfParallelism = ARGON2_PARALLELISM;
+    } catch (err) {
+      console.warn("[kdf] Argon2id no disponible en rotación, fallback HONESTO a PBKDF2:", err);
+      newMasterKey = await deriveMasterKey(
+        newPassword,
+        pbkdf2LegacyParams(newSalt, KDF_ITERATIONS),
+      );
+      newKdfAlgorithm = "pbkdf2";
+      newKdfIterations = KDF_ITERATIONS;
+      newKdfMemoryKiB = undefined;
+      newKdfParallelism = undefined;
+    }
+  } else {
+    newMasterKey = await deriveMasterKey(
+      newPassword,
+      pbkdf2LegacyParams(newSalt, KDF_ITERATIONS),
+    );
+    newKdfAlgorithm = "pbkdf2";
+    newKdfIterations = KDF_ITERATIONS;
+    newKdfMemoryKiB = undefined;
+    newKdfParallelism = undefined;
+  }
+
+  // 3. Re-cifrar la MISMA privateKey JWK con la nueva masterKey
+  const { ciphertext: newEncryptedJwk, iv: newIv } = await aesEncrypt(
+    newMasterKey,
+    privateKeyJwkStr,
+  );
+  const newEncryptedPrivateKey: EncryptedPrivateKey = {
+    encryptedJwk: newEncryptedJwk,
+    iv: newIv,
+  };
+
+  // 4. Construir publicKey JWK desde la privateKey JWK (mismo n, e)
+  const publicKeyJwk: JsonWebKey = {
+    kty: privateKeyJwk.kty,
+    n: privateKeyJwk.n,
+    e: privateKeyJwk.e,
+  };
+
+  // 5. Fingerprint de la publicKey (para PoP message)
+  const newKdfSaltB64 = bufToBase64(newSalt);
+  const fingerprint = await publicKeyFingerprint(publicKeyJwk);
+
+  // 6. Importar temporalmente la privateKey como RSA-PSS para firmar PoP
+  const normalizedEmail = email.toLowerCase().trim();
+  const signingKey = await crypto.subtle.importKey(
+    "jwk",
+    sanitizeJwk(privateKeyJwk),
+    { name: "RSA-PSS", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const msg = buildPopMessage(normalizedEmail, fingerprint, newKdfSaltB64);
+  const sig = await crypto.subtle.sign(
+    { name: "RSA-PSS", saltLength: 32 },
+    signingKey,
+    msg as BufferSource,
+  );
+  const newPopSignature = bufToBase64(sig);
+
+  return {
+    newKdfAlgorithm,
+    newKdfSalt: newKdfSaltB64,
+    newKdfIterations: newKdfIterations,
+    newKdfMemoryKiB: newKdfMemoryKiB,
+    newKdfParallelism: newKdfParallelism,
+    newEncryptedPrivateKey,
+    newPopSignature,
+    newMasterKey,
+  };
+}
+
+/**
+ * Construye una publicKey JWK a partir de una privateKey JWK.
+ * En RSA, la publicKey contiene los mismos `n` y `e` que la privateKey,
+ * pero sin `d`, `p`, `q`, `dp`, `dq`, `qi`.
+ *
+ * Web Crypto no permite "derivar" la publicKey desde una CryptoKey privada
+ * directamente, pero podemos exportar la privateKey a JWK y construir la
+ * publicKey JWK manualmente conservando solo los campos públicos.
+ */
+async function derivePublicJwkFromPrivate(privateKey: CryptoKey): Promise<JsonWebKey> {
+  const privJwk = await exportPrivateKeyJwk(privateKey);
+  return {
+    kty: privJwk.kty,
+    n: privJwk.n,
+    e: privJwk.e,
+  };
+}
+
+// =========================================================================
+// 13. MULTI-DEVICE SYNC — ECDH (P-256) para autorizar nuevos dispositivos
+// =========================================================================
+//
+// Cada dispositivo tiene su propio par ECDH (P-256). Cuando el usuario
+// quiere autorizar un dispositivo nuevo:
+//
+//   1. Dispositivo B (nuevo) genera par ECDH, muestra código + publicKeyECDH.
+//   2. Dispositivo A (logueado) escanea, deriva shared secret ECDH
+//      (A.privateKeyECDH × B.publicKeyECDH), y usa ese shared secret
+//      como llave AES-256 para envolver la privateKey RSA del usuario.
+//   3. Servidor almacena el blob en Device.wrappedPrivateKeyForDevice.
+//   4. Dispositivo B hace polling, recibe el blob, deriva el mismo
+//      shared secret (B.privateKeyECDH × A.publicKeyECDH) y desenvuelve.
+//
+// El servidor NUNCA ve la privateKey RSA ni el shared secret ECDH.
+// =========================================================================
+
+const ECDH_CURVE = "P-256"; // NIST P-256, ~128-bit security, soportado por Web Crypto
+
+/** Genera un par ECDH P-256 para un dispositivo. */
+export async function generateEcdhKeyPair(): Promise<CryptoKeyPair> {
+  return crypto.subtle.generateKey(
+    { name: "ECDH", namedCurve: ECDH_CURVE },
+    true,
+    ["deriveKey", "deriveBits"],
+  );
+}
+
+export async function exportEcdhPublicKeyJwk(key: CryptoKey): Promise<JsonWebKey> {
+  return crypto.subtle.exportKey("jwk", key);
+}
+
+export async function importEcdhPublicKeyJwk(jwk: JsonWebKey): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    "jwk",
+    sanitizeJwk(jwk),
+    { name: "ECDH", namedCurve: ECDH_CURVE },
+    true,
+    [],
+  );
+}
+
+export async function importEcdhPrivateKeyJwk(jwk: JsonWebKey): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    "jwk",
+    sanitizeJwk(jwk),
+    { name: "ECDH", namedCurve: ECDH_CURVE },
+    false,
+    ["deriveKey", "deriveBits"],
+  );
+}
+
+/**
+ * Deriva una llave simétrica AES-256-GCM a partir de ECDH entre
+ * la privateKey propia y la publicKey del peer.
+ *
+ * Esta llave solo existe en los dos dispositivos (A y B) — nunca
+ * sale ni se envía al servidor.
+ */
+export async function deriveEcdhSharedAesKey(
+  ownPrivateKey: CryptoKey,
+  peerPublicKey: CryptoKey,
+): Promise<CryptoKey> {
+  return crypto.subtle.deriveKey(
+    { name: "ECDH", public: peerPublicKey },
+    ownPrivateKey,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+/**
+ * Envuelve (cifra) la privateKey RSA del usuario con una llave AES
+ * derivada de ECDH. Usado por el dispositivo A para autorizar al
+ * dispositivo B.
+ *
+ * Recibe la privateKey RSA como JWK string (porque la CryptoKey en
+ * sesión es no-extraíble), la cifra con AES-256-GCM usando la llave
+ * ECDH compartida.
+ */
+export async function wrapPrivateKeyForDevice(
+  privateKeyJwkStr: string,
+  ecdhSharedKey: CryptoKey,
+): Promise<{ wrappedKey: string; iv: string }> {
+  const { ciphertext, iv } = await aesEncrypt(ecdhSharedKey, privateKeyJwkStr);
+  return { wrappedKey: ciphertext, iv };
+}
+
+/**
+ * Desenvuelve (descifra) la privateKey RSA del usuario usando la llave
+ * AES derivada de ECDH. Usado por el dispositivo B tras recibir el
+ * blob del servidor.
+ */
+export async function unwrapPrivateKeyForDevice(
+  wrappedKeyB64: string,
+  ivB64: string,
+  ecdhSharedKey: CryptoKey,
+): Promise<CryptoKey> {
+  const privateKeyJwkStr = await aesDecrypt(ecdhSharedKey, wrappedKeyB64, ivB64);
+  const jwk = JSON.parse(privateKeyJwkStr) as JsonWebKey;
+  return importPrivateKeyJwk(jwk);
+}
+
+// =========================================================================
+// 13b. CHALLENGE-RESPONSE ECDSA (P-256) para Enroll Device
+// =========================================================================
+//
+// Cierra la brecha crítica del flujo Enroll Device:
+//   1. El servidor genera un challenge (nonce 32 bytes) y lo asocia al
+//      deviceId con TTL corto (60s).
+//   2. El Dispositivo B firma el challenge con su privateKey ECDH usando
+//      ECDSA P-256 (SHA-256).
+//   3. El servidor verifica la firma con la publicKeyECDH registrada.
+//      Solo si es válida, devuelve la wrappedPrivateKeyForDevice.
+//
+// Esto prueba posesión de la privateKey ECDH, no solo conocimiento del
+// deviceId. Un atacante que intercepte el deviceId no puede responder
+// al challenge sin la privateKey.
+//
+// Nota: ECDSA P-256 reutiliza el mismo par de llaves que ECDH P-256
+// matemáticamente (mismo grupo curva), pero Web Crypto requiere importar
+// la llave con uso `sign`/`verify` por separado.
+// =========================================================================
+
+const ECDSA_CURVE = "P-256";
+
+/**
+ * Importa una JWK de privateKey ECDH como ECDSA para firmar challenges.
+ * Mismo par de llaves, distinto uso.
+ */
+export async function importEcdhPrivateKeyForSigning(jwk: JsonWebKey): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    "jwk",
+    sanitizeJwk(jwk),
+    { name: "ECDSA", namedCurve: ECDSA_CURVE },
+    false,
+    ["sign"],
+  );
+}
+
+/**
+ * Importa una JWK de publicKey ECDH como ECDSA para verificar challenges.
+ */
+export async function importEcdhPublicKeyForVerifying(jwk: JsonWebKey): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    "jwk",
+    sanitizeJwk(jwk),
+    { name: "ECDSA", namedCurve: ECDSA_CURVE },
+    true,
+    ["verify"],
+  );
+}
+
+/**
+ * Firma un challenge (nonce) con ECDSA P-256 + SHA-256.
+ * Devuelve la firma en base64.
+ *
+ * Usado por el Dispositivo B para probar posesión de su privateKey ECDH.
+ */
+export async function signChallenge(
+  privateKey: CryptoKey,
+  challengeB64: string,
+): Promise<string> {
+  const signature = await crypto.subtle.sign(
+    { name: "ECDSA", hash: "SHA-256" },
+    privateKey,
+    base64ToBuf(challengeB64) as BufferSource,
+  );
+  return bufToBase64(signature);
+}
+
+/**
+ * Verifica una firma ECDSA P-256 sobre un challenge.
+ * Usado por el servidor en /api/devices/enroll/poll/verify.
+ */
+export async function verifyChallenge(params: {
+  publicKeyJwk: JsonWebKey;
+  challengeB64: string;
+  signatureB64: string;
+}): Promise<boolean> {
+  const { publicKeyJwk, challengeB64, signatureB64 } = params;
+  try {
+    const publicKey = await importEcdhPublicKeyForVerifying(publicKeyJwk);
+    return crypto.subtle.verify(
+      { name: "ECDSA", hash: "SHA-256" },
+      publicKey,
+      base64ToBuf(signatureB64) as BufferSource,
+      base64ToBuf(challengeB64) as BufferSource,
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Genera un código de enrollment de 6 dígitos (criptográficamente
+ * seguro). El dispositivo B lo muestra al usuario, quien lo introduce
+ * en el dispositivo A para vincularlos.
+ */
+export function generateEnrollCode(): string {
+  const bytes = randomBytes(4);
+  const num =
+    ((bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3]) >>> 0;
+  return (num % 1_000_000).toString().padStart(6, "0");
+}
+
+// =========================================================================
+// 13c. POST-QUANTUM KEM (Kyber/ML-KEM 768) — Hybrid Key Exchange
+// =========================================================================
+//
+// Mejora #1: Integración de ML-KEM (CRYSTALS-Kyber) como KEM post-quántico
+// junto a ECDH P-256 para ofrecer cifrado híbrido (ECDH + Kyber).
+//
+// Esquema híbrido:
+//   1. Cada dispositivo genera un par ECDH P-256 Y un par Kyber ML-KEM 768.
+//   2. Durante el enrollment, el dispositivo A (logueado) deriva DOS shared
+//      secrets: ECDH(A.priv × B.pub) + Kyber encapsulate(B.pubKyber).
+//   3. Ambos shared secrets se combinan vía SHA-256 para producir la llave
+//      AES final que envuelve la privateKey RSA del usuario.
+//   4. Un atacante que rompa ECDH (computación cuántica) aún necesitaría
+//      romper Kyber, y viceversa. Mientras AL MENOS UNO de los dos
+//      algoritmos sea seguro, el secreto compuesto es seguro.
+//
+// ML-KEM 768 (~NIST security level 3) es el parámetro recomendado para
+// un balance seguridad/rendimiento. Level 5 (1024) está disponible si se
+// necesita máxima seguridad.
+//
+// Esta integración es la primera capa de defensa post-quántica. En el futuro,
+// Kyber podría reemplazar completamente a ECDH cuando Web Crypto lo soporte
+// nativamente.
+// =========================================================================
+
+export type KyberSecurityLevel = 512 | 768 | 1024;
+
+const KYBER_DEFAULT_LEVEL: KyberSecurityLevel = 768;
+
+export interface KyberKeyPair {
+  publicKey: Uint8Array;
+  privateKey: Uint8Array;
+}
+
+export interface KyberCiphertext {
+  ciphertext: Uint8Array;
+  sharedSecret: Uint8Array;
+}
+
+/**
+ * Genera un par de llaves Kyber ML-KEM en el nivel especificado.
+ * ML-KEM 768 (recomendado) produce 1184 bytes de publicKey y 2400 bytes
+ * de privateKey. Todo en memoria, nunca sale del navegador.
+ */
+export async function generateKyberKeyPair(
+  level: KyberSecurityLevel = KYBER_DEFAULT_LEVEL,
+): Promise<KyberKeyPair> {
+  const { default: Kyber } = await import("crystals-kyber-js");
+  const kyber = new Kyber(level);
+  const { publicKey, privateKey } = kyber.generateKeypair();
+  return { publicKey: new Uint8Array(publicKey), privateKey: new Uint8Array(privateKey) };
+}
+
+/**
+ * Encapsula: genera un ciphertext + shared secret a partir de una
+ * publicKey Kyber. El ciphertext se envía al peer; el shared secret
+ * se combina con el ECDH shared secret para formar la llave híbrida.
+ */
+export async function kyberEncapsulate(
+  publicKey: Uint8Array,
+  level: KyberSecurityLevel = KYBER_DEFAULT_LEVEL,
+): Promise<KyberCiphertext> {
+  const { default: Kyber } = await import("crystals-kyber-js");
+  const kyber = new Kyber(level);
+  const { cipherText, sharedSecret } = kyber.encapsulate(publicKey);
+  return { ciphertext: new Uint8Array(cipherText), sharedSecret: new Uint8Array(sharedSecret) };
+}
+
+/**
+ * Decapsula: recupera el shared secret a partir de un ciphertext +
+ * privateKey Kyber. Usado por el peer para derivar el mismo shared secret.
+ */
+export async function kyberDecapsulate(
+  ciphertext: Uint8Array,
+  privateKey: Uint8Array,
+  level: KyberSecurityLevel = KYBER_DEFAULT_LEVEL,
+): Promise<Uint8Array> {
+  const { default: Kyber } = await import("crystals-kyber-js");
+  const kyber = new Kyber(level);
+  const sharedSecret = kyber.decapsulate(ciphertext, privateKey);
+  return new Uint8Array(sharedSecret);
+}
+
+/**
+ * Deriva una llave AES-256-GCM a partir de la combinación híbrida
+ * de dos shared secrets: ECDH + Kyber. Se concatenan y se hashean
+ * con SHA-256 para producir una única llave de 256 bits.
+ *
+ * Zeroeamos los buffers intermedios después de usarlos.
+ * Si Kyber no está disponible, se usa solo ECDH (fallback seguro).
+ */
+export async function deriveHybridSharedAesKey(
+  ecdhSharedKey: CryptoKey,
+  kyberSharedSecret: Uint8Array | null,
+): Promise<CryptoKey> {
+  const ecdhRaw = await crypto.subtle.exportKey("raw", ecdhSharedKey);
+  const combined = new Uint8Array(ecdhRaw.byteLength + (kyberSharedSecret?.length ?? 0));
+  combined.set(new Uint8Array(ecdhRaw), 0);
+  zeroBuffer(ecdhRaw);
+  if (kyberSharedSecret) {
+    combined.set(kyberSharedSecret, ecdhRaw.byteLength);
+    zeroBuffer(kyberSharedSecret);
+  }
+  const hash = await crypto.subtle.digest("SHA-256", combined);
+  zeroBuffer(combined);
+  return crypto.subtle.importKey(
+    "raw",
+    hash,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+/**
+ * Serializa una Kyber publicKey a base64 para enviarla al servidor
+ * como parte del enrollment de dispositivo.
+ */
+export function kyberPublicKeyToBase64(publicKey: Uint8Array): string {
+  return bufToBase64(publicKey);
+}
+
+/**
+ * Deserializa una Kyber publicKey desde base64.
+ */
+export function kyberPublicKeyFromBase64(b64: string): Uint8Array {
+  return base64ToBuf(b64);
+}
+
+/**
+ * Serializa una Kyber ciphertext a base64 para almacenar en el servidor
+ * junto con el enrollment (el ciphertext lo necesita el dispositivo B).
+ */
+export function kyberCiphertextToBase64(ciphertext: Uint8Array): string {
+  return bufToBase64(ciphertext);
+}
+
+export function kyberCiphertextFromBase64(b64: string): Uint8Array {
+  return base64ToBuf(b64);
+}
+
+// =========================================================================
+// 14. RECOVERY KEY (BIP-39) — Backup cifrado de la privateKey
+// =========================================================================
+//
+// Genera una frase semilla de 24 palabras (256 bits de entropía, BIP-39).
+// El usuario la guarda offline. Se deriva a una llave AES-256 para cifrar
+// la privateKey RSA del usuario como backup de recuperación.
+//
+// Si el usuario olvida su contraseña maestra, introduce las 24 palabras
+// → se deriva la recovery key → se descifra la privateKey RSA → se puede
+// re-establecer una nueva contraseña maestra.
+//
+// El servidor NUNCA ve las 24 palabras — solo el blob cifrado.
+// =========================================================================
+
+const RECOVERY_KDF_ITERATIONS = 600_000; // PBKDF2 alto — no bloquea UI porque solo se usa en recuperación
+
+/**
+ * Genera una frase semilla BIP-39 de 24 palabras (256 bits de entropía).
+ * Devuelve { mnemonic, entropyHex }.
+ *
+ * El usuario debe guardar las 24 palabras offline. La entropía NO se
+ * envía al servidor.
+ */
+export async function generateRecoveryMnemonic(): Promise<{
+  mnemonic: string;
+  entropyHex: string;
+}> {
+  // Usamos la librería bip39 (dependencia instalada)
+  const { generateMnemonic, entropyToMnemonic, mnemonicToEntropy } = await import("bip39");
+  // 24 palabras = 256 bits de entropía
+  const mnemonic = generateMnemonic(256);
+  const entropyHex = mnemonicToEntropy(mnemonic);
+  return { mnemonic, entropyHex };
+}
+
+/**
+ * Valida que una frase BIP-39 sea correcta (checksum + palabras válidas).
+ */
+export async function validateRecoveryMnemonic(mnemonic: string): Promise<boolean> {
+  const { validateMnemonic } = await import("bip39");
+  return validateMnemonic(mnemonic.trim().toLowerCase());
+}
+
+/**
+ * Deriva una llave AES-256-GCM a partir de la frase BIP-39.
+ *
+ * Usamos PBKDF2 con muchas iteraciones (no Argon2id) porque:
+ *   1. La frase tiene 256 bits de entropía — no necesita memory-hardness
+ *      (no es una contraseña baja-entropía).
+ *   2. PBKDF2 es universalmente soportado y la recuperación es rara.
+ *
+ * El salt debe ser aleatorio por usuario y almacenarse en el servidor.
+ */
+export async function deriveRecoveryKey(
+  mnemonic: string,
+  salt: Uint8Array,
+  iterations: number = RECOVERY_KDF_ITERATIONS,
+): Promise<CryptoKey> {
+  const normalized = mnemonic.trim().toLowerCase().normalize("NFC");
+  const passwordKey = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(normalized),
+    { name: "PBKDF2" },
+    false,
+    ["deriveKey"],
+  );
+  return crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: salt as BufferSource,
+      iterations,
+      hash: "SHA-256",
+    },
+    passwordKey,
+    { name: "AES-GCM", length: AES_KEY_LENGTH },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+/**
+ * Cifra la privateKey RSA con la recovery key. Devuelve el blob que
+ * se envía al servidor como `encryptedPrivateKeyForRecovery`.
+ */
+export async function encryptPrivateKeyForRecovery(
+  privateKeyJwkStr: string,
+  recoveryKey: CryptoKey,
+): Promise<{ ciphertext: string; iv: string }> {
+  return aesEncrypt(recoveryKey, privateKeyJwkStr);
+}
+
+/**
+ * Descifra la privateKey RSA usando la recovery key. Usado en el flujo
+ * de recuperación de cuenta.
+ */
+export async function decryptPrivateKeyForRecovery(
+  encryptedB64: string,
+  ivB64: string,
+  recoveryKey: CryptoKey,
+): Promise<CryptoKey> {
+  const jwkStr = await aesDecrypt(recoveryKey, encryptedB64, ivB64);
+  const jwk = JSON.parse(jwkStr) as JsonWebKey;
+  return importPrivateKeyJwk(jwk);
+}
+
+export const RECOVERY_ITERATIONS = RECOVERY_KDF_ITERATIONS;
+
+// =========================================================================
+// 15. AUDIT LOG CIFRADO (Zero-Knowledge Logging)
+// =========================================================================
+//
+// Los logs se generan y CIFRAN en el cliente con una llave de auditoría
+// derivada de la masterKey vía HKDF. El servidor solo almacena blobs.
+//
+// La llave de auditoría es DISTINTA de la masterKey para que un atacante
+// con la masterKey (ej. via sesión abierta) no pueda leer logs históricos
+// si la llave de auditoría se rotó. Se deriva como:
+//   HKDF-SHA256(masterKey, salt="", info="zk-vault-audit-log-v1", length=32)
+//
+// El servidor NUNCA ve:
+//   - El contenido del log (cifrado AES-256-GCM)
+//   - La llave de auditoría
+//   - La masterKey
+//
+// Solo ve: userId, categoría (para indexación), timestamp.
+// =========================================================================
+
+/**
+ * Deriva la llave de auditoría desde la masterKey usando HKDF.
+ *
+ * HKDF expande la masterKey en una llave independiente para que los
+ * logs no se puedan descifrar con la masterKey directamente.
+ */
+export async function deriveAuditKey(masterKey: CryptoKey): Promise<CryptoKey> {
+  // Web Crypto no soporta HKDF directamente sobre AES-GCM keys.
+  // Workaround: exportar masterKey como raw (es no-extraíble por defecto,
+  // así que esto falla). En su lugar, usamos masterKey para cifrar un
+  // secreto fijo y derivar la llave del ciphertext.
+  //
+  // Mejor enfoque: usar la masterKey como input a PBKDF2 con un salt fijo
+  // y un info string, lo que produce una llave independiente.
+  //
+  // Como la masterKey es AES-GCM no-extraíble, no podemos obtener sus raw
+  // bytes. En su lugar, la usamos para cifrar un nonce fijo, y el
+  // ciphertext resultante (32 bytes) se usa como semilla para derivar
+  // la audit key vía PBKDF2.
+
+  // Cifrar un nonce fijo con la masterKey → produce 12 (IV) + 16 (tag) + 32 (plaintext) = 60 bytes
+  const fixedNonce = new TextEncoder().encode("zk-vault-audit-nonce-v1");
+  const iv = new Uint8Array(12); // IV fijo de ceros — OK porque el plaintext es único
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: iv as BufferSource },
+    masterKey,
+    fixedNonce,
+  );
+
+  // Usar el ciphertext como semilla para derivar la audit key
+  const seedKey = await crypto.subtle.importKey(
+    "raw",
+    ciphertext,
+    { name: "PBKDF2" },
+    false,
+    ["deriveKey"],
+  );
+
+  return crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: new TextEncoder().encode("zk-vault-audit-salt"),
+      iterations: 100_000, // bajo porque la semilla ya es alta-entropía
+      hash: "SHA-256",
+    },
+    seedKey,
+    { name: "AES-GCM", length: AES_KEY_LENGTH },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+/**
+ * Crea y cifra un evento de auditoría.
+ *
+ * El evento es un JSON con: { type, timestamp, details, ... }
+ * Se serializa y se cifra con AES-256-GCM usando la audit key.
+ */
+export async function encryptAuditEvent(
+  auditKey: CryptoKey,
+  event: Record<string, unknown>,
+): Promise<{ encryptedEvent: string; eventIv: string }> {
+  const eventStr = JSON.stringify({
+    ...event,
+    timestamp: new Date().toISOString(),
+  });
+  const { ciphertext, iv } = await aesEncrypt(auditKey, eventStr);
+  return { encryptedEvent: ciphertext, eventIv: iv };
+}
+
+/**
+ * Descifra un evento de auditoría.
+ */
+export async function decryptAuditEvent(
+  auditKey: CryptoKey,
+  encryptedEventB64: string,
+  eventIvB64: string,
+): Promise<Record<string, unknown>> {
+  const eventStr = await aesDecrypt(auditKey, encryptedEventB64, eventIvB64);
+  return JSON.parse(eventStr);
+}
+
+export type AuditCategory = "auth" | "secret" | "share" | "device" | "recovery";
+
+----- fin del archivo -----
+
+
+================================================================================
+  CRYPTO SERVER: src/lib/crypto-server.ts
+================================================================================
+  Ruta original:  src/lib/crypto-server.ts
+  Tamano:         12803 bytes
+  Lineas:         348
+================================================================================
+----- inicio del archivo -----
+
+/**
+ * =====================================================================
+ * crypto-server.ts — Validaciones criptográficas del lado del SERVIDOR.
+ * =====================================================================
+ * El servidor sigue siendo un "crypto-blind store", pero ahora:
+ *   1. Verifica Proof-of-Possession (PoP) en el registro — garantiza
+ *      que el cliente realmente posee la privateKey correspondiente
+ *      a la publicKey que está registrando.
+ *   2. Valida longitudes de salt, IVs, blobs, JWKs y kdfIterations.
+ *   3. Genera respuestas decoy para login de usuarios inexistentes,
+ *      previniendo enumeración de emails.
+ *
+ * NUNCA realiza operaciones de descifrado de material del usuario.
+ * =====================================================================
+ */
+import { webcrypto, createHmac } from "node:crypto";
+import { env } from "@/lib/env";
+
+// Web Crypto está disponible en Node 18+ como global, pero en algunos
+// runtimes (Edge) conviene referenciarlo explícitamente.
+const subtle = webcrypto.subtle;
+
+// Límites server-side — deben coincidir con el cliente
+export const KDF_ITERATIONS_MIN = 310_000;
+export const KDF_ITERATIONS_MAX = 1_000_000;
+export const SALT_MIN_BYTES = 16; // 128 bits
+export const SALT_MAX_BYTES = 64; // anti-DoS
+export const IV_EXPECTED_BYTES = 12; // GCM recomendado
+export const MAX_BLOB_BYTES = 64 * 1024; // 64 KiB
+export const MAX_JWK_BYTES = 4 * 1024; // 4 KiB
+export const MAX_POP_SIGNATURE_BYTES = 512; // RSA-2048 signature = 256 bytes, margen
+
+// ---------------------------------------------------------------------------
+// Helpers de serialización (base64 <-> bytes) — server-side
+// ---------------------------------------------------------------------------
+export function base64ToBytes(b64: string): Uint8Array {
+  const binary = Buffer.from(b64, "base64");
+  return new Uint8Array(binary);
+}
+
+export function bytesToBase64(bytes: Uint8Array): string {
+  return Buffer.from(bytes).toString("base64");
+}
+
+// ---------------------------------------------------------------------------
+// Validadores — TODO devuelve boolean o lanza; el caller decide HTTP code
+// ---------------------------------------------------------------------------
+export function isValidBase64(s: unknown): s is string {
+  if (typeof s !== "string" || s.length === 0) return false;
+  return /^[A-Za-z0-9+/=_-]+$/.test(s);
+}
+
+export function validateKdfIterations(it: unknown): it is number {
+  return (
+    typeof it === "number" &&
+    Number.isInteger(it) &&
+    it >= KDF_ITERATIONS_MIN &&
+    it <= KDF_ITERATIONS_MAX
+  );
+}
+
+/**
+ * Valida que un string sea base64 Y que al decodificar esté dentro del
+ * rango de bytes esperado. Esto previene DoS por blobs gigantes y
+ * también previene salts degenerados (1 byte).
+ */
+export function validateBase64Blob(
+  s: unknown,
+  minBytes: number,
+  maxBytes: number,
+): s is string {
+  if (!isValidBase64(s)) return false;
+  let decoded: Uint8Array;
+  try {
+    decoded = base64ToBytes(s);
+  } catch {
+    return false;
+  }
+  return decoded.length >= minBytes && decoded.length <= maxBytes;
+}
+
+// ---------------------------------------------------------------------------
+// Canonicalización JWK + fingerprint (server-side mirror del cliente)
+// ---------------------------------------------------------------------------
+/**
+ * Canonicaliza una JWK eliminando key_ops, ext y alg antes de ordenar.
+ * Debe ser IDÉNTICA a la función del cliente (crypto-client.ts).
+ */
+export function canonicalJwkString(jwk: Record<string, unknown>): string {
+  const {
+    key_ops: _kops,
+    ext: _ext,
+    alg: _alg,
+    ...material
+  } = jwk;
+  const sorted: Record<string, unknown> = {};
+  for (const k of Object.keys(material).sort()) {
+    sorted[k] = (material as Record<string, unknown>)[k];
+  }
+  return JSON.stringify(sorted);
+}
+
+export async function publicKeyFingerprint(
+  jwk: Record<string, unknown>,
+): Promise<string> {
+  const canon = canonicalJwkString(jwk);
+  const hash = await subtle.digest("SHA-256", new TextEncoder().encode(canon));
+  const bytes = new Uint8Array(hash);
+  let hex = "";
+  for (let i = 0; i < bytes.length; i++) {
+    hex += bytes[i].toString(16).padStart(2, "0");
+  }
+  return hex;
+}
+
+// ---------------------------------------------------------------------------
+// Proof-of-Possession (PoP) — verificación server-side
+// ---------------------------------------------------------------------------
+export function buildPopMessage(
+  email: string,
+  fingerprintHex: string,
+  kdfSaltB64: string,
+): Uint8Array {
+  const msg = `zk-vault-pop-v1\nemail=${email}\nfingerprint=${fingerprintHex}\nsalt=${kdfSaltB64}`;
+  return new TextEncoder().encode(msg);
+}
+
+/**
+ * Importa una JWK como llave pública RSA-PSS para verificación de PoP.
+ *
+ * Nota: Bun (runtime del servidor) NO soporta pasar un array de
+ * algoritmos a importKey. Por eso importamos SOLO como RSA-PSS aquí.
+ * Si más adelante el servidor necesita usar la misma publicKey para
+ * RSA-OAEP (no es el caso actual), deberá importarse por separado.
+ */
+async function importRsaPublicKeyForVerify(jwk: JsonWebKey): Promise<CryptoKey> {
+  // Sanitizar key_ops / ext / alg para evitar inconsistencias
+  const { key_ops: _kops, ext: _ext, alg: _alg, ...clean } = jwk;
+  const result = await subtle.importKey(
+    "jwk",
+    clean,
+    { name: "RSA-PSS", hash: "SHA-256" },
+    true,
+    ["verify"],
+  );
+  return result as unknown as CryptoKey;
+}
+
+/**
+ * Verifica una firma PoP RSA-PSS.
+ * Devuelve true solo si la firma es válida.
+ */
+export async function verifyPopSignature(params: {
+  publicKeyJwk: JsonWebKey;
+  signatureB64: string;
+  email: string;
+  fingerprintHex: string;
+  kdfSaltB64: string;
+}): Promise<boolean> {
+  const { publicKeyJwk, signatureB64, email, fingerprintHex, kdfSaltB64 } = params;
+
+  // Validaciones previas
+  if (!isValidBase64(signatureB64)) return false;
+  const sigBytes = base64ToBytes(signatureB64);
+  if (sigBytes.length > MAX_POP_SIGNATURE_BYTES) return false;
+
+  try {
+    const pubKey = await importRsaPublicKeyForVerify(publicKeyJwk);
+    const msg = buildPopMessage(email, fingerprintHex, kdfSaltB64);
+    return subtle.verify(
+      { name: "RSA-PSS", saltLength: 32 },
+      pubKey,
+      sigBytes as unknown as NodeJS.BufferSource,
+      msg as unknown as NodeJS.BufferSource,
+    );
+  } catch {
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Decoy login — respuestas byte-a-byte idénticas para usuarios inexistentes
+// ---------------------------------------------------------------------------
+/**
+ * HMAC-SHA-256 con un secreto del servidor para derivar material decoy
+ * determinista a partir del email. Esto permite responder al login de
+ * un email NO registrado con EXACTAMENTE la misma estructura que un
+ * email registrado, evitando enumeración.
+ *
+ * El material decoy:
+ *   - kdfSalt: 16 bytes deterministas (parece un salt real)
+ *   - kdfIterations: KDF_ITERATIONS_MIN (constante, plausible)
+ *   - encryptedPrivateKeyJwk: 256 bytes deterministas (tamaño plausible
+ *     de RSA-2048 GCM ciphertext, NO descifrable por el cliente)
+ *   - privateKeyIv: 12 bytes deterministas
+ *   - publicKeyJwk: una JWK RSA-2048 generada deterministamente (no
+ *     corresponde a ninguna llave privada real, pero estructuralmente
+ *     válida para que el cliente pueda importarla sin error antes de
+ *     fallar el descifrado)
+ *
+ * El atacante que reciba esto ejecutará PBKDF2 + AES-GCM y obtendrá
+ * un error de tag GCM inválido — idéntico al comportamiento cuando
+ * un usuario real introduce su contraseña maestra incorrecta.
+ */
+const DECOY_HMAC_KEY_ENV = env.DECOY_HMAC_KEY;
+if (!DECOY_HMAC_KEY_ENV) {
+  throw new Error(
+    "DECOY_HMAC_KEY environment variable is required. " +
+    "Generate one with: openssl rand -hex 32",
+  );
+}
+
+function hmacSha256(input: string): Uint8Array {
+  // createHmac es sincrono y compatible con todos los runtimes Node.
+  // Usamos la importación estática al inicio del archivo (createHmac).
+  const h = createHmac("sha256", DECOY_HMAC_KEY_ENV!).update(input).digest();
+  return new Uint8Array(h);
+}
+
+/**
+ * Genera material decoy determinista a partir del email.
+ * El email se normaliza a minúsculas para que el mismo email con
+ * diferente capitalización produzca el mismo decoy.
+ */
+export function generateDecoyLoginResponse(email: string): {
+  kdfSalt: string;
+  kdfIterations: number;
+  encryptedPrivateKeyJwk: string;
+  privateKeyIv: string;
+  publicKeyJwk: JsonWebKey;
+  isDecoy: true;
+} {
+  const normalizedEmail = email.toLowerCase().trim();
+
+  // 1. Derivar varios bloques del email usando HKDF-like expansion
+  //    sobre HMAC-SHA-256.
+  const block1 = hmacSha256(`salt:${normalizedEmail}`); // 32 bytes
+  const block2 = hmacSha256(`iv:${normalizedEmail}`); // 32 bytes
+  const block3 = hmacSha256(`ciphertext:${normalizedEmail}`); // 32 bytes
+  const block4 = hmacSha256(`ciphertext2:${normalizedEmail}`); // 32 bytes
+  const block5 = hmacSha256(`ciphertext3:${normalizedEmail}`); // 32 bytes
+  const block6 = hmacSha256(`ciphertext4:${normalizedEmail}`); // 32 bytes
+
+  // Salt de 16 bytes (usamos la primera mitad de block1)
+  const kdfSalt = bytesToBase64(block1.slice(0, 16));
+
+  // IV de 12 bytes (primera parte de block2)
+  const privateKeyIv = bytesToBase64(block2.slice(0, 12));
+
+  // Ciphertext de 256 bytes (8 bloques de 32 bytes = 256 bytes — plausible
+  // para AES-GCM de una JWK RSA-2048 que es ~1.2 KiB)
+  const ctBytes = new Uint8Array(256);
+  ctBytes.set(block3, 0);
+  ctBytes.set(block4, 32);
+  ctBytes.set(block5, 64);
+  ctBytes.set(block6, 96);
+  // Rellenar el resto repitiendo con contexto diferente
+  for (let i = 128; i < 256; i += 32) {
+    const b = hmacSha256(`ct-fill:${normalizedEmail}:${i}`);
+    ctBytes.set(b.subarray(0, 32), i);
+  }
+  const encryptedPrivateKeyJwk = bytesToBase64(ctBytes);
+
+  // publicKeyJwk decoy: una JWK RSA con n de 2048 bits derivada de los
+  // bloques HMAC. NO es criptográficamente válida como par RSA real,
+  // pero el cliente puede importarla (structurally) y fallará más
+  // adelante al intentar descifrar la privateKey. El objetivo es que
+  // la respuesta JSON tenga IDÉNTICA estructura que un usuario real.
+  const nHex = Array.from(block1)
+    .concat(Array.from(block2))
+    .concat(Array.from(block3))
+    .concat(Array.from(block4))
+    .concat(Array.from(block5))
+    .concat(Array.from(block6))
+    .concat(Array.from(hmacSha256(`n-fill:${normalizedEmail}`)))
+    .concat(Array.from(hmacSha256(`n-fill2:${normalizedEmail}`)))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  // Asegurar que el byte alto de n esté seteado (MSB=1) para que sea
+  // un módulo RSA-2048 plausible (256 bytes = 512 hex chars)
+  const nBytes = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) {
+    nBytes[i] = parseInt(nHex.substr(i * 2, 2), 16);
+  }
+  nBytes[0] |= 0x80; // MSB set para tamaño correcto
+  // Asegurar impar (n debe ser impar en RSA)
+  nBytes[255] |= 0x01;
+
+  const publicKeyJwk: JsonWebKey = {
+    kty: "RSA",
+    n: bytesToBase64(nBytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""),
+    e: "AQAB", // 65537 — exponente estándar
+    alg: "RSA-OAEP-256",
+    // kid no es estándar en JsonWebKey pero lo añadimos via cast
+    ...(normalizedEmail ? { kid: `decoy-${normalizedEmail}` } : {}),
+  } as JsonWebKey;
+
+  return {
+    kdfSalt,
+    kdfIterations: KDF_ITERATIONS_MIN,
+    encryptedPrivateKeyJwk,
+    privateKeyIv,
+    publicKeyJwk,
+    isDecoy: true,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Challenge-Response ECDSA P-256 (server-side mirror del cliente)
+// Usado en /api/devices/enroll/poll/verify
+// ---------------------------------------------------------------------------
+
+/**
+ * Verifica una firma ECDSA P-256 sobre un challenge usando la publicKey
+ * ECDH del dispositivo. Reutiliza el mismo par de llaves que ECDH P-256
+ * pero con uso `verify`.
+ */
+export async function verifyChallenge(params: {
+  publicKeyJwk: JsonWebKey;
+  challengeB64: string;
+  signatureB64: string;
+}): Promise<boolean> {
+  const { publicKeyJwk, challengeB64, signatureB64 } = params;
+  try {
+    // Sanitizar JWK (eliminar key_ops, ext, alg)
+    const { key_ops: _kops, ext: _ext, alg: _alg, ...clean } = publicKeyJwk;
+
+    const publicKey = await subtle.importKey(
+      "jwk",
+      clean,
+      { name: "ECDSA", namedCurve: "P-256" },
+      true,
+      ["verify"],
+    );
+
+    const signature = base64ToBytes(signatureB64);
+    const challenge = base64ToBytes(challengeB64);
+
+    return subtle.verify(
+      { name: "ECDSA", hash: "SHA-256" },
+      publicKey,
+      signature as unknown as NodeJS.BufferSource,
+      challenge as unknown as NodeJS.BufferSource,
+    );
+  } catch {
+    return false;
+  }
+}
+
+----- fin del archivo -----
+
+
+================================================================================
+  KEY MANAGEMENT: src/lib/key-rotation.ts
+================================================================================
+  Ruta original:  src/lib/key-rotation.ts
+  Tamano:         1974 bytes
+  Lineas:         60
+================================================================================
+----- inicio del archivo -----
+
+"use client";
+
+import { useSession } from "./session-store";
+
+const ROTATION_INTERVAL_DAYS = 30;
+const ROTATION_WARN_DAYS = 3;
+
+export interface RotationStatus {
+  needsRotation: boolean;
+  daysSinceRotation: number;
+  daysUntilWarning: number;
+  daysUntilOverdue: number;
+}
+
+export function getRotationStatus(
+  lastRotationAt: string | null | undefined,
+): RotationStatus {
+  if (!lastRotationAt) {
+    return { needsRotation: true, daysSinceRotation: 999, daysUntilWarning: 0, daysUntilOverdue: 0 };
+  }
+  const last = new Date(lastRotationAt).getTime();
+  const now = Date.now();
+  const daysSince = Math.floor((now - last) / (1000 * 60 * 60 * 24));
+  return {
+    needsRotation: daysSince >= ROTATION_INTERVAL_DAYS,
+    daysSinceRotation: daysSince,
+    daysUntilWarning: Math.max(0, ROTATION_INTERVAL_DAYS - ROTATION_WARN_DAYS - daysSince),
+    daysUntilOverdue: Math.max(0, ROTATION_INTERVAL_DAYS - daysSince),
+  };
+}
+
+export async function checkRotationAndNotify(): Promise<void> {
+  const state = useSession.getState();
+  if (!state.userId) return;
+  try {
+    const res = await fetch("/api/auth/rotation-status");
+    if (!res.ok) return;
+    const data = await res.json();
+    const status = getRotationStatus(data.lastKeyRotationAt);
+    if (status.needsRotation) {
+      const { toast } = await import("sonner");
+      toast.warning(
+        `Tu contraseña maestra necesita rotación (${status.daysSinceRotation} días sin cambiar).`,
+        {
+          description: "Cambia tu contraseña para mantener la seguridad de tu bóveda.",
+          action: { label: "Rotar ahora", onClick: () => window.dispatchEvent(new CustomEvent("open-rotate-password")) },
+          duration: 10000,
+        },
+      );
+    } else if (status.daysUntilWarning === 0) {
+      const { toast } = await import("sonner");
+      toast.info(
+        `Tu contraseña caduca en ${status.daysUntilOverdue} días.`,
+        { duration: 8000 },
+      );
+    }
+  } catch {
+    // Silent fail
+  }
+}
+
+----- fin del archivo -----
+
+
+================================================================================
+  API REGISTER
+================================================================================
+  Ruta original:  src/app/api/auth/register/route.ts
+  Tamano:         3606 bytes
+  Lineas:         118
+================================================================================
+----- inicio del archivo -----
+
+/**
+ * POST /api/auth/register
+ *
+ * Recibe EXCLUSIVAMENTE blobs cifrados y llaves públicas.
+ * Validaciones server-side (Ciclo 1 de auditoría):
+ *   - kdfIterations ∈ [310_000, 1_000_000] (anti-DoS + mínimo OWASP)
+ *   - kdfSalt decodificado ∈ [16, 64] bytes
+ *   - privateKeyIv decodificado = 12 bytes exactos
+ *   - encryptedPrivateKeyJwk ≤ 64 KiB
+ *   - publicKeyJwk ≤ 4 KiB y contiene kty, n, e
+ *   - popSignature ≤ 512 bytes y es RSA-PSS válida sobre
+ *     {email, publicKeyFingerprint, kdfSalt}
+ *
+ * El servidor NO descifra nada. Solo verifica la firma PoP con la
+ * publicKey que el cliente declara — esto prueba que el cliente posee
+ * la privateKey correspondiente, previniendo sustitución de publicKey.
+ */
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import {
+  publicKeyFingerprint,
+  verifyPopSignature,
+} from "@/lib/crypto-server";
+import { registerSchema, validatePayload } from "@/lib/validation-schemas";
+
+const NAME_MAX_LEN = 100;
+
+export async function POST(req: NextRequest) {
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+  }
+
+  // Validación con Zod — rechaza cualquier campo que no sea un blob
+  // cifrado válido o un parámetro en rango.
+  const validation = validatePayload(registerSchema, body);
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
+  }
+  const {
+    email,
+    name,
+    kdfAlgorithm,
+    kdfSalt,
+    kdfIterations,
+    kdfMemoryKiB,
+    kdfParallelism,
+    publicKeyJwk,
+    encryptedPrivateKeyJwk,
+    privateKeyIv,
+    popSignature,
+  } = validation.data;
+
+  const normalizedEmail = email.toLowerCase().trim();
+  const jwkStr = JSON.stringify(publicKeyJwk);
+
+  // -------- Verificar PoP ANTES de tocar la BD --------
+  const serverFingerprint = await publicKeyFingerprint(publicKeyJwk as Record<string, unknown>);
+
+  const popValid = await verifyPopSignature({
+    publicKeyJwk: publicKeyJwk as JsonWebKey,
+    signatureB64: popSignature,
+    email: normalizedEmail,
+    fingerprintHex: serverFingerprint,
+    kdfSaltB64: kdfSalt,
+  });
+
+  if (!popValid) {
+    return NextResponse.json(
+      {
+        error:
+          "Proof-of-Possession inválida: la firma RSA-PSS no corresponde a la publicKey declarada. Posible intento de sustitución de llave.",
+      },
+      { status: 403 },
+    );
+  }
+
+  // -------- Verificar unicidad --------
+  const existing = await db.user.findUnique({ where: { email: normalizedEmail } });
+  if (existing) {
+    return NextResponse.json({ error: "El email ya está registrado" }, { status: 409 });
+  }
+
+  // -------- Persistir --------
+  const user = await db.user.create({
+    data: {
+      email: normalizedEmail,
+      name:
+        typeof name === "string" && name.trim() ? name.trim().slice(0, NAME_MAX_LEN) : null,
+      keyMaterial: {
+        create: {
+          kdfAlgorithm,
+          kdfSalt,
+          kdfIterations,
+          kdfMemoryKiB: kdfAlgorithm === "argon2id" ? kdfMemoryKiB : null,
+          kdfParallelism: kdfAlgorithm === "argon2id" ? kdfParallelism : null,
+          publicKeyJwk: jwkStr,
+          publicKeyFingerprint: serverFingerprint,
+          popSignature,
+          popSignatureHash: "SHA-256",
+          encryptedPrivateKeyJwk,
+          privateKeyIv,
+        },
+      },
+    },
+    include: { keyMaterial: true },
+  });
+
+  return NextResponse.json({
+    userId: user.id,
+    email: user.email,
+    name: user.name,
+    publicKeyFingerprint: serverFingerprint,
+    createdAt: user.createdAt,
+  });
+}
+
+----- fin del archivo -----
+
+
+================================================================================
+  API LOGIN
+================================================================================
+  Ruta original:  src/app/api/auth/login/route.ts
+  Tamano:         4596 bytes
+  Lineas:         135
+================================================================================
+----- inicio del archivo -----
+
+/**
+ * POST /api/auth/login
+ *
+ * MEJORAS Ciclo 2:
+ *   1. Rate-limiting: 5 intentos / 15 min / IP+email. Devuelve 429 con
+ *      Retry-After si se excede. Previene ataques de fuerza bruta que
+ *      intentan obtener material para brute-force offline.
+ *   2. Emite un session token HMAC-signed (HS256) que el cliente debe
+ *      enviar en `Authorization: Bearer <token>` en todas las requests
+ *      autenticadas. Reemplaza el header x-user-id que era forjable.
+ *
+ * Body: { email }
+ * Response (real o decoy):
+ *   { userId, email, name, kdfSalt, kdfIterations,
+ *     encryptedPrivateKeyJwk, privateKeyIv, publicKeyJwk,
+ *     publicKeyFingerprint, sessionToken, expiresAt, isDecoy? }
+ */
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import {
+  generateDecoyLoginResponse,
+  publicKeyFingerprint,
+} from "@/lib/crypto-server";
+import { issueSessionToken, SESSION_TTL } from "@/lib/session-token";
+import { loginSchema, validatePayload } from "@/lib/validation-schemas";
+import { checkRateLimit, resetRateLimit, getClientIp, RATE_LIMIT_POLICIES } from "@/lib/rate-limit";
+
+export async function POST(req: NextRequest) {
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+  }
+
+  const validation = validatePayload(loginSchema, body);
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
+  }
+  const email = validation.data.email;
+  const normalizedEmail = email.toLowerCase().trim();
+  const ip = getClientIp(req);
+
+  // -------- Rate limit (async — usa Redis o Map) --------
+  const rlKey = `login:${ip}:${normalizedEmail}`;
+  const rl = await checkRateLimit(
+    rlKey,
+    RATE_LIMIT_POLICIES.login.maxAttempts,
+    RATE_LIMIT_POLICIES.login.windowMs,
+  );
+  if (!rl.allowed) {
+    return NextResponse.json(
+      {
+        error: "Demasiados intentos. Intenta más tarde.",
+        retryAfter: rl.retryAfterSeconds,
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(rl.retryAfterSeconds),
+          "X-RateLimit-Remaining": "0",
+          "X-RateLimit-Reset": String(rl.retryAfterSeconds),
+        },
+      },
+    );
+  }
+
+  const user = await db.user.findUnique({
+    where: { email: normalizedEmail },
+    include: { keyMaterial: true },
+  });
+
+  // -------- CASO 1: usuario real --------
+  if (user && user.keyMaterial) {
+    await resetRateLimit(rlKey);
+
+    const km = user.keyMaterial;
+    const fingerprint = km.publicKeyFingerprint;
+    const sessionToken = issueSessionToken(user.id);
+    const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL;
+
+    return NextResponse.json({
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      kdfAlgorithm: km.kdfAlgorithm, // "argon2id" | "pbkdf2"
+      kdfSalt: km.kdfSalt,
+      kdfIterations: km.kdfIterations,
+      kdfMemoryKiB: km.kdfMemoryKiB, // null para PBKDF2
+      kdfParallelism: km.kdfParallelism, // null para PBKDF2
+      encryptedPrivateKeyJwk: km.encryptedPrivateKeyJwk,
+      privateKeyIv: km.privateKeyIv,
+      publicKeyJwk: JSON.parse(km.publicKeyJwk),
+      publicKeyFingerprint: fingerprint,
+      sessionToken,
+      expiresAt,
+      isDecoy: false,
+    });
+  }
+
+  // -------- CASO 2: usuario inexistente → DECOY --------
+  // Rate limit específico para decoy: evita DoS por generación costosa.
+  const decoyRlKey = `decoy-gen:${ip}:${normalizedEmail}`;
+  const decoyRl = await checkRateLimit(decoyRlKey, 5, 60_000);
+  if (!decoyRl.allowed) {
+    return NextResponse.json(
+      {
+        error: "Demasiados intentos. Intenta más tarde.",
+        retryAfter: decoyRl.retryAfterSeconds,
+      },
+      { status: 429 },
+    );
+  }
+
+  // IMPORTANTE: NO reseteamos el rate-limit aquí, para que un atacante
+  // que sonda emails inexistentes consuma su cupo de intentos.
+  const decoy = generateDecoyLoginResponse(normalizedEmail);
+  return NextResponse.json({
+    userId: `decoy-${normalizedEmail}`,
+    email: normalizedEmail,
+    name: null,
+    kdfAlgorithm: "argon2id" as const, // mismo algoritmo que cuentas reales
+    kdfSalt: decoy.kdfSalt,
+    kdfIterations: decoy.kdfIterations,
+    kdfMemoryKiB: 65536, // 64 MiB — plausible
+    kdfParallelism: 4,
+    encryptedPrivateKeyJwk: decoy.encryptedPrivateKeyJwk,
+    privateKeyIv: decoy.privateKeyIv,
+    publicKeyJwk: decoy.publicKeyJwk,
+    publicKeyFingerprint: await publicKeyFingerprint(decoy.publicKeyJwk as Record<string, unknown>),
+    sessionToken: null,
+    expiresAt: null,
+    isDecoy: true,
+  });
+}
+
+----- fin del archivo -----
+
+
+================================================================================
+  API SECRETS
+================================================================================
+  Ruta original:  src/app/api/secrets/route.ts
+  Tamano:         3478 bytes
+  Lineas:         118
+================================================================================
+----- inicio del archivo -----
+
+/**
+ * /api/secrets
+ *   GET  — Lista secretos propios + compartidos con el usuario autenticado.
+ *   POST — Crea un nuevo secreto. Recibe solo blobs cifrados.
+ *
+ * MEJORA Ciclo 2: usa Authorization: Bearer <token> en lugar del
+ * header x-user-id que era forjable.
+ */
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { requireAuth } from "@/lib/auth-helper";
+import { createSecretSchema, validatePayload, parsePagination } from "@/lib/validation-schemas";
+
+// ----------------------- GET (list) -----------------------
+export async function GET(req: NextRequest) {
+  const auth = await requireAuth(req);
+  if (!auth.ok) return auth.response;
+  const userId = auth.userId;
+
+  const { offset, limit } = parsePagination(req.nextUrl.searchParams);
+
+  const [shares, total] = await Promise.all([
+    db.secretKeyShare.findMany({
+      where: { recipientId: userId },
+      include: {
+        secret: {
+          include: {
+            owner: { select: { id: true, email: true, name: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      skip: offset,
+      take: limit,
+    }),
+    db.secretKeyShare.count({
+      where: { recipientId: userId },
+    }),
+  ]);
+
+  const secrets = shares.map((s) => ({
+    id: s.secret.id,
+    ownerId: s.secret.ownerId,
+    ownerEmail: s.secret.owner.email,
+    ownerName: s.secret.owner.name,
+    ownedByMe: s.secret.ownerId === userId,
+    encryptedTitle: s.secret.encryptedTitle,
+    titleIv: s.secret.titleIv,
+    encryptedData: s.secret.encryptedData,
+    dataIv: s.secret.dataIv,
+    encryptedMetadata: s.secret.encryptedMetadata,
+    metadataIv: s.secret.metadataIv,
+    secretType: s.secret.secretType,
+    wrappedKey: s.wrappedSymmetricKey,
+    createdAt: s.secret.createdAt,
+    sharedAt: s.createdAt,
+  }));
+
+  return NextResponse.json({
+    secrets,
+    pagination: {
+      offset,
+      limit,
+      total,
+      hasMore: offset + limit < total,
+    },
+  });
+}
+
+// ----------------------- POST (create) -----------------------
+export async function POST(req: NextRequest) {
+  const auth = await requireAuth(req);
+  if (!auth.ok) return auth.response;
+  const userId = auth.userId;
+
+  let body: any;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+  }
+
+  const validation = validatePayload(createSecretSchema, body);
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
+  }
+  const { encryptedTitle, titleIv, encryptedData, dataIv, wrappedKeyForOwner, secretType, encryptedMetadata, metadataIv } = validation.data;
+
+  const user = await db.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
+  }
+
+  const secret = await db.$transaction(async (tx) => {
+    const newSecret = await tx.secret.create({
+      data: {
+        ownerId: userId,
+        encryptedTitle,
+        titleIv,
+        encryptedData,
+        dataIv,
+        secretType,
+        encryptedMetadata: encryptedMetadata ?? null,
+        metadataIv: metadataIv ?? null,
+      },
+    });
+    await tx.secretKeyShare.create({
+      data: {
+        secretId: newSecret.id,
+        recipientId: userId,
+        wrappedSymmetricKey: wrappedKeyForOwner,
+      },
+    });
+    return newSecret;
+  });
+
+  return NextResponse.json({ secretId: secret.id, createdAt: secret.createdAt });
+}
+
+----- fin del archivo -----
+
+
+================================================================================
+  LAYOUT
+================================================================================
+  Ruta original:  src/app/layout.tsx
+  Tamano:         1708 bytes
+  Lineas:         66
+================================================================================
+----- inicio del archivo -----
+
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
+import { Toaster } from "@/components/ui/toaster";
+import { ThemeProvider } from "@/components/ThemeProvider";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "Zero-Knowledge Vault — Gestor de Contraseñas para Equipos",
+  description:
+    "Gestor de contraseñas Zero-Knowledge con cifrado end-to-end en el navegador. AES-256-GCM, Argon2id, RSA-OAEP, ECDH. El servidor nunca ve tus secretos.",
+  keywords: [
+    "zero-knowledge",
+    "password manager",
+    "encryption",
+    "AES-256-GCM",
+    "Argon2id",
+    "Web Crypto API",
+    "ECDH",
+    "security",
+  ],
+  authors: [{ name: "ZK Vault Team" }],
+  icons: {
+    icon: "/logo.svg",
+  },
+  openGraph: {
+    title: "Zero-Knowledge Vault",
+    description:
+      "Gestor de contraseñas Zero-Knowledge con cifrado end-to-end en el navegador.",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Zero-Knowledge Vault",
+    description:
+      "Gestor de contraseñas Zero-Knowledge con cifrado end-to-end en el navegador.",
+  },
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="es" suppressHydrationWarning>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
+      >
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
+        <Toaster />
+      </body>
+    </html>
+  );
+}
+
+----- fin del archivo -----
+
+
+================================================================================
+  PAGE
+================================================================================
+  Ruta original:  src/app/page.tsx
+  Tamano:         3379 bytes
+  Lineas:         81
+================================================================================
+----- inicio del archivo -----
+
+"use client";
+
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArchitectureView } from "@/components/ArchitectureView";
+import { AuthView } from "@/components/AuthView";
+import { VaultView } from "@/components/VaultView";
+import { useSession, isAuthenticated } from "@/lib/session-store";
+import { Lock, BookOpen, Database, ShieldCheck } from "lucide-react";
+
+export default function Home() {
+  const session = useSession();
+  const authed = isAuthenticated(session);
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      {/* Header */}
+      <header className="sticky top-0 z-30 border-b border-border/40 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-9 items-center justify-center rounded-lg bg-primary/15">
+              <Lock className="size-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-sm font-semibold leading-tight sm:text-base">
+                Zero-Knowledge Vault
+              </h1>
+              <p className="hidden text-[10px] text-muted-foreground sm:block">
+                Gestor de contraseñas para equipos · cifrado end-to-end en el navegador
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="hidden items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[10px] text-primary sm:flex">
+              <Lock className="size-3" />
+              AES-256-GCM · RSA-OAEP · PBKDF2
+            </span>
+            {authed ? (
+              <span className="rounded-full border border-border/40 bg-card px-2.5 py-1 text-[10px] text-muted-foreground">
+                {session.email}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      </header>
+
+      {/* Main */}
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+        <Tabs defaultValue="arch" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 sm:max-w-md">
+            <TabsTrigger value="arch" className="text-xs sm:text-sm">
+              <BookOpen className="mr-1.5 size-3.5 sm:size-4" />
+              Arquitectura
+            </TabsTrigger>
+            <TabsTrigger value="vault" className="text-xs sm:text-sm">
+              <Database className="mr-1.5 size-3.5 sm:size-4" />
+              Demo Vault
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="arch" className="mt-6">
+            <ArchitectureView />
+          </TabsContent>
+
+          <TabsContent value="vault" className="mt-6">
+            {authed ? <VaultView /> : <AuthView />}
+          </TabsContent>
+        </Tabs>
+      </main>
+
+      {/* Footer */}
+      <footer className="mt-auto border-t border-border/40 bg-background/50">
+        <div className="mx-auto max-w-6xl px-4 py-4 text-center text-[10px] text-muted-foreground sm:px-6">
+          <p>
+            Implementación de referencia · Web Crypto API · El servidor nunca recibe llaves
+            maestras, llaves privadas en claro, ni llaves simétricas.
+          </p>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+----- fin del archivo -----
+
+
+================================================================================
+  AUTH VIEW
+================================================================================
+  Ruta original:  src/components/AuthView.tsx
+  Tamano:         15341 bytes
+  Lineas:         393
+================================================================================
+----- inicio del archivo -----
+
+"use client";
+
+import { useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { useSession } from "@/lib/session-store";
+import { performRegistration, performLogin, importPublicKeyJwk } from "@/lib/crypto-client";
+import { NewDeviceEnrollView } from "./NewDeviceEnrollView";
+import { Loader2, ShieldCheck, KeyRound, LogIn, UserPlus, Eye, EyeOff, Smartphone } from "lucide-react";
+
+export function AuthView() {
+  const { toast } = useToast();
+  const login = useSession((s) => s.login);
+
+  // ----- Modo: "auth" (login/register) o "newdevice" (enroll B) -----
+  const [mode, setMode] = useState<"auth" | "newdevice">("auth");
+
+  // ----- Registro -----
+  const [regEmail, setRegEmail] = useState("");
+  const [regName, setRegName] = useState("");
+  const [regPass, setRegPass] = useState("");
+  const [regPass2, setRegPass2] = useState("");
+  const [regBusy, setRegBusy] = useState(false);
+
+  // ----- Login -----
+  const [logEmail, setLogEmail] = useState("");
+  const [logPass, setLogPass] = useState("");
+  const [logBusy, setLogBusy] = useState(false);
+
+  const [showPass, setShowPass] = useState(false);
+
+  async function handleRegister(e: React.FormEvent) {
+    e.preventDefault();
+    if (regBusy) return;
+    if (regPass.length < 10) {
+      toast({
+        variant: "destructive",
+        title: "Contraseña débil",
+        description: "Mínimo 10 caracteres para la contraseña maestra.",
+      });
+      return;
+    }
+    if (regPass !== regPass2) {
+      toast({
+        variant: "destructive",
+        title: "Las contraseñas no coinciden",
+      });
+      return;
+    }
+
+    setRegBusy(true);
+    try {
+      // 1. Todo el trabajo criptográfico en el cliente
+      const artifacts = await performRegistration(regEmail, regPass);
+
+      // 2. Enviar SOLO blobs al servidor — incluyendo PoP + fingerprint
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: regEmail,
+          name: regName || undefined,
+          kdfAlgorithm: artifacts.kdfAlgorithm,
+          kdfSalt: artifacts.kdfSalt,
+          kdfIterations: artifacts.kdfIterations,
+          kdfMemoryKiB: artifacts.kdfMemoryKiB,
+          kdfParallelism: artifacts.kdfParallelism,
+          publicKeyJwk: artifacts.publicKeyJwk,
+          publicKeyFingerprint: artifacts.publicKeyFingerprint,
+          popSignature: artifacts.popSignature,
+          encryptedPrivateKeyJwk: artifacts.encryptedPrivateKey.encryptedJwk,
+          privateKeyIv: artifacts.encryptedPrivateKey.iv,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error ?? "Error al registrar");
+      }
+
+      // 3. Autosesión inmediata — pero necesitamos un sessionToken.
+      //    El endpoint /register NO emite tokens (no recibe la contraseña
+      //    para validación, solo blobs). Así que llamamos a /login para
+      //    obtener el token. Ya tenemos masterKey + privateKey en memoria,
+      //    así que el descifrado del login será instantáneo.
+      const loginRes = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: regEmail }),
+      });
+      const loginData = await loginRes.json();
+      if (!loginRes.ok || !loginData.sessionToken) {
+        throw new Error("Registro OK pero no se pudo iniciar sesión automáticamente.");
+      }
+
+      // 4. Autosesión inmediata con token
+      login({
+        userId: data.userId,
+        email: data.email,
+        name: data.name,
+        publicKeyJwk: artifacts.publicKeyJwk,
+        sessionToken: loginData.sessionToken,
+        expiresAt: loginData.expiresAt,
+        masterKey: artifacts.masterKey,
+        privateKey: artifacts.privateKey,
+        publicKey: artifacts.publicKey,
+      });
+
+      toast({
+        title: "Registro exitoso",
+        description: "Llave privada cifrada con tu llave maestra (AES-256-GCM) + firma PoP verificada por el servidor (RSA-PSS). El servidor nunca vio ninguno de los dos en claro.",
+      });
+
+      setRegEmail("");
+      setRegName("");
+      setRegPass("");
+      setRegPass2("");
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Error de registro",
+        description: err?.message ?? "Error desconocido",
+      });
+    } finally {
+      setRegBusy(false);
+    }
+  }
+
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    if (logBusy) return;
+    setLogBusy(true);
+    try {
+      // 1. Pedir al servidor el material criptográfico PÚBLICO del usuario.
+      //    Si el email NO existe, el servidor devuelve un DECOY con la misma
+      //    estructura — el cliente no puede distinguirlo de un usuario real
+      //    hasta que el descifrado AES-GCM falle con tag inválido.
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: logEmail }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error ?? "Error al iniciar sesión");
+      }
+
+      // 2. Derivar masterKey y descifrar la privateKey LOCALMENTE.
+      //    Para un decoy, AES-GCM lanzará una excepción (tag inválido) —
+      //    mismo comportamiento que contraseña incorrecta.
+      const { masterKey, privateKey } = await performLogin({
+        password: logPass,
+        kdfAlgorithm: data.kdfAlgorithm,
+        kdfSaltB64: data.kdfSalt,
+        kdfIterations: data.kdfIterations,
+        kdfMemoryKiB: data.kdfMemoryKiB,
+        kdfParallelism: data.kdfParallelism,
+        encryptedPrivateKeyJwkB64: data.encryptedPrivateKeyJwk,
+        privateKeyIvB64: data.privateKeyIv,
+      });
+
+      // 3. Importar la llave pública para tenerla lista en sesión
+      const publicKey = await importPublicKeyJwk(data.publicKeyJwk);
+
+      // 4. Guardar sessionToken emitido por el servidor (HMAC-signed)
+      if (!data.sessionToken) {
+        // Esto solo ocurre si el login era un decoy — pero el descifrado
+        // ya debería haber fallado arriba. Por seguridad, abortamos.
+        throw new Error("No se emitió token de sesión.");
+      }
+
+      login({
+        userId: data.userId,
+        email: data.email,
+        name: data.name,
+        publicKeyJwk: data.publicKeyJwk,
+        sessionToken: data.sessionToken,
+        expiresAt: data.expiresAt,
+        masterKey,
+        privateKey,
+        publicKey,
+      });
+
+      toast({
+        title: "Sesión iniciada",
+        description: "Tu llave privada se descifró localmente. El servidor nunca recibió tu contraseña maestra.",
+      });
+
+      setLogEmail("");
+      setLogPass("");
+    } catch (err: any) {
+      // Mensaje uniforme — no revelamos si el email existe o no
+      toast({
+        variant: "destructive",
+        title: "No se pudo iniciar sesión",
+        description:
+          "Email o contraseña maestra incorrectos. Recuerda: el servidor nunca valida la contraseña, solo devuelve blobs — el descifrado ocurre en tu navegador.",
+      });
+    } finally {
+      setLogBusy(false);
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-md space-y-3">
+      {/* Toggle: modo auth normal vs nuevo dispositivo */}
+      <div className="flex gap-2">
+        <Button
+          variant={mode === "auth" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setMode("auth")}
+          className="flex-1"
+        >
+          <LogIn className="mr-1.5 size-3.5" /> Iniciar sesión
+        </Button>
+        <Button
+          variant={mode === "newdevice" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setMode("newdevice")}
+          className="flex-1"
+        >
+          <Smartphone className="mr-1.5 size-3.5" /> Nuevo dispositivo
+        </Button>
+      </div>
+
+      {mode === "newdevice" ? (
+        <NewDeviceEnrollView onDone={() => setMode("auth")} />
+      ) : (
+        <Card className="border-primary/30 bg-card/80">
+        <CardHeader className="text-center">
+          <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-xl bg-primary/15">
+            <ShieldCheck className="size-6 text-primary" />
+          </div>
+          <CardTitle className="text-xl">Acceso a la bóveda</CardTitle>
+          <CardDescription className="text-xs">
+            Todo el material criptográfico se procesa en tu navegador con Web Crypto API.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="login">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="login" className="text-xs">
+                <LogIn className="mr-1.5 size-3.5" /> Iniciar sesión
+              </TabsTrigger>
+              <TabsTrigger value="register" className="text-xs">
+                <UserPlus className="mr-1.5 size-3.5" /> Registrar
+              </TabsTrigger>
+            </TabsList>
+
+            {/* LOGIN */}
+            <TabsContent value="login" className="mt-4">
+              <form onSubmit={handleLogin} className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="logEmail" className="text-xs">Email</Label>
+                  <Input
+                    id="logEmail"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={logEmail}
+                    onChange={(e) => setLogEmail(e.target.value)}
+                    placeholder="tu@equipo.com"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="logPass" className="text-xs">Contraseña maestra</Label>
+                  <div className="relative">
+                    <Input
+                      id="logPass"
+                      type={showPass ? "text" : "password"}
+                      autoComplete="current-password"
+                      required
+                      value={logPass}
+                      onChange={(e) => setLogPass(e.target.value)}
+                      placeholder="••••••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPass((v) => !v)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      tabIndex={-1}
+                    >
+                      {showPass ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </button>
+                  </div>
+                </div>
+                <Button type="submit" disabled={logBusy} className="w-full">
+                  {logBusy ? (
+                    <>
+                      <Loader2 className="mr-2 size-4 animate-spin" /> Derivando llave…
+                    </>
+                  ) : (
+                    <>
+                      <KeyRound className="mr-2 size-4" /> Desbloquear bóveda
+                    </>
+                  )}
+                </Button>
+                <p className="text-center text-[10px] text-muted-foreground">
+                  Tu contraseña se usa para derivar (PBKDF2) una llave que descifra tu llave
+                  privada localmente. Nunca se envía al servidor.
+                </p>
+              </form>
+            </TabsContent>
+
+            {/* REGISTER */}
+            <TabsContent value="register" className="mt-4">
+              <form onSubmit={handleRegister} className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="regEmail" className="text-xs">Email</Label>
+                  <Input
+                    id="regEmail"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={regEmail}
+                    onChange={(e) => setRegEmail(e.target.value)}
+                    placeholder="tu@equipo.com"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="regName" className="text-xs">Nombre (opcional)</Label>
+                  <Input
+                    id="regName"
+                    type="text"
+                    value={regName}
+                    onChange={(e) => setRegName(e.target.value)}
+                    placeholder="Ana García"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="regPass" className="text-xs">
+                    Contraseña maestra <span className="text-muted-foreground">(mín. 10)</span>
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="regPass"
+                      type={showPass ? "text" : "password"}
+                      autoComplete="new-password"
+                      required
+                      value={regPass}
+                      onChange={(e) => setRegPass(e.target.value)}
+                      placeholder="••••••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPass((v) => !v)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      tabIndex={-1}
+                    >
+                      {showPass ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="regPass2" className="text-xs">Repetir contraseña maestra</Label>
+                  <Input
+                    id="regPass2"
+                    type={showPass ? "text" : "password"}
+                    autoComplete="new-password"
+                    required
+                    value={regPass2}
+                    onChange={(e) => setRegPass2(e.target.value)}
+                    placeholder="••••••••••••"
+                  />
+                </div>
+                <Button type="submit" disabled={regBusy} className="w-full">
+                  {regBusy ? (
+                    <>
+                      <Loader2 className="mr-2 size-4 animate-spin" /> Generando llaves RSA…
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="mr-2 size-4" /> Crear bóveda
+                    </>
+                  )}
+                </Button>
+                <p className="text-center text-[10px] text-muted-foreground">
+                  Se generará un par RSA-OAEP 2048-bit. La llave privada se cifra con AES-256-GCM
+                  usando tu llave maestra PBKDF2 antes de salir del navegador.
+                </p>
+              </form>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+      )}
+    </div>
+  );
+}
+
+----- fin del archivo -----
+
+
+================================================================================
+  VAULT VIEW
+================================================================================
+  Ruta original:  src/components/VaultView.tsx
+  Tamano:         17228 bytes
+  Lineas:         465
+================================================================================
+----- inicio del archivo -----
+
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { useSession } from "@/lib/session-store";
+import { useApi } from "@/lib/api-client";
+import {
+  Lock,
+  Plus,
+  RefreshCw,
+  Share2,
+  Eye,
+  Loader2,
+  Inbox,
+  ShieldCheck,
+  LogOut,
+  KeyRound,
+  Clock,
+  Trash2,
+  UserX,
+  KeyRound as RotateIcon,
+  Smartphone,
+  KeyRound as RecoveryIcon,
+  ScrollText,
+} from "lucide-react";
+import { CreateSecretDialog } from "./CreateSecretDialog";
+import { ViewSecretDialog, type SecretListItem } from "./ViewSecretDialog";
+import { ShareSecretDialog } from "./ShareSecretDialog";
+import { RotatePasswordDialog } from "./RotatePasswordDialog";
+import { EnrollDeviceDialog } from "./EnrollDeviceDialog";
+import { RecoverySetupDialog } from "./RecoverySetupDialog";
+import { AuditLogViewer } from "./AuditLogViewer";
+
+export function VaultView() {
+  const { toast } = useToast();
+  const session = useSession();
+  const logout = useSession((s) => s.logout);
+  const { apiFetch, serverLogout } = useApi();
+
+  const [secrets, setSecrets] = useState<SecretListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [selected, setSelected] = useState<SecretListItem | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<SecretListItem | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<SecretListItem | null>(null);
+  const [busyAction, setBusyAction] = useState(false);
+  const [rotateOpen, setRotateOpen] = useState(false);
+  const [enrollDeviceOpen, setEnrollDeviceOpen] = useState(false);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [auditLogOpen, setAuditLogOpen] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await apiFetch("/api/secrets");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Error al cargar");
+      setSecrets(data.secrets ?? []);
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Error al cargar secretos",
+        description: err?.message,
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  function openView(s: SecretListItem) {
+    setSelected(s);
+    setViewOpen(true);
+  }
+  function openShare(s: SecretListItem) {
+    setSelected(s);
+    setShareOpen(true);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setBusyAction(true);
+    try {
+      const res = await apiFetch(`/api/secrets/${deleteTarget.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Error al borrar");
+      toast({
+        title: "Secreto borrado",
+        description:
+          "Secreto y todas sus shares eliminados del servidor. Copias descifradas localmente por destinatarios previos no pueden ser revocadas.",
+      });
+      setDeleteTarget(null);
+      load();
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Error al borrar",
+        description: err?.message,
+      });
+    } finally {
+      setBusyAction(false);
+    }
+  }
+
+  async function confirmRevoke() {
+    if (!revokeTarget) return;
+    setBusyAction(true);
+    try {
+      const res = await apiFetch(`/api/shares`, {
+        method: "DELETE",
+        body: JSON.stringify({
+          secretId: revokeTarget.id,
+          recipientId: session.userId, // esto es para "compartidos conmigo" — salir del share
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Error al revocar");
+      toast({
+        title: "Has salido del secreto",
+        description: `Ya no verás "${revokeTarget.id.slice(-8)}" en tu bóveda.`,
+      });
+      setRevokeTarget(null);
+      load();
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err?.message,
+      });
+    } finally {
+      setBusyAction(false);
+    }
+  }
+
+  const mine = secrets.filter((s) => s.ownedByMe);
+  const shared = secrets.filter((s) => !s.ownedByMe);
+
+  return (
+    <div className="space-y-5">
+      {/* Toolbar */}
+      <Card className="bg-card/60">
+        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-primary/15">
+              <ShieldCheck className="size-5 text-primary" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-foreground">{session.email}</span>
+                {session.name ? (
+                  <span className="text-xs text-muted-foreground">· {session.name}</span>
+                ) : null}
+              </div>
+              <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                <KeyRound className="size-3" />
+                Sesión autenticada con token HMAC · llave privada en memoria
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+              <RefreshCw className={`mr-2 size-3.5 ${loading ? "animate-spin" : ""}`} />
+              Refrescar
+            </Button>
+            <Button size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="mr-2 size-3.5" /> Nuevo secreto
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEnrollDeviceOpen(true)}
+              title="Autorizar nuevo dispositivo"
+            >
+              <Smartphone className="mr-2 size-3.5" /> Dispositivo
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRotateOpen(true)}
+              title="Rotar contraseña maestra"
+            >
+              <RotateIcon className="mr-2 size-3.5" /> Rotar clave
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRecoveryOpen(true)}
+              title="Configurar backup de recuperación"
+            >
+              <RecoveryIcon className="mr-2 size-3.5" /> Recovery
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAuditLogOpen(true)}
+              title="Ver audit log"
+            >
+              <ScrollText className="mr-2 size-3.5" /> Audit
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => serverLogout()}>
+              <LogOut className="mr-2 size-3.5" /> Salir
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Mis secretos */}
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <Lock className="size-4 text-primary" /> Mis secretos
+            <Badge variant="outline" className="text-[10px]">{mine.length}</Badge>
+          </h2>
+        </div>
+        <SecretGrid
+          items={mine}
+          loading={loading}
+          onOpen={openView}
+          onShare={openShare}
+          onDelete={(s) => setDeleteTarget(s)}
+          emptyHint="Aún no tienes secretos. Crea el primero con «Nuevo secreto»."
+        />
+      </div>
+
+      {/* Compartidos conmigo */}
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <Share2 className="size-4 text-primary" /> Compartidos conmigo
+            <Badge variant="outline" className="text-[10px]">{shared.length}</Badge>
+          </h2>
+        </div>
+        <SecretGrid
+          items={shared}
+          loading={loading}
+          onOpen={openView}
+          onShare={() => {}}
+          onLeave={(s) => setRevokeTarget(s)}
+          shareable={false}
+          emptyHint="Nadie ha compartido secretos contigo todavía."
+        />
+      </div>
+
+      {/* Diálogos */}
+      <CreateSecretDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={load} />
+      <ViewSecretDialog open={viewOpen} onOpenChange={setViewOpen} secret={selected} />
+      <ShareSecretDialog open={shareOpen} onOpenChange={setShareOpen} secret={selected} />
+      <RotatePasswordDialog
+        open={rotateOpen}
+        onOpenChange={setRotateOpen}
+        onRotated={() => {
+          logout();
+          toast({
+            title: "Sesión cerrada",
+            description: "Inicia sesión con tu nueva contraseña maestra.",
+          });
+        }}
+      />
+      <EnrollDeviceDialog open={enrollDeviceOpen} onOpenChange={setEnrollDeviceOpen} />
+      <RecoverySetupDialog open={recoveryOpen} onOpenChange={setRecoveryOpen} />
+      <AuditLogViewer open={auditLogOpen} onOpenChange={setAuditLogOpen} />
+
+      {/* Confirmar borrado de secreto propio */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="size-4 text-destructive" /> ¿Borrar secreto?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-xs leading-relaxed">
+              Esta acción es irreversible. Se borrarán el secreto cifrado y todas las
+              <strong> shares </strong> compartidas con otros usuarios. Ellos perderán acceso a
+              partir de este momento.
+              <br /><br />
+              <strong className="text-amber-500">Advertencia:</strong> copias que ya descifraron y
+              guardaron localmente no pueden ser revocadas. Si crees que el secreto está
+              comprometido, <strong>cámbialo antes de borrarlo</strong>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busyAction}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={busyAction}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {busyAction ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Trash2 className="mr-2 size-4" />}
+              Borrar definitivamente
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirmar salida de share (compartidos conmigo) */}
+      <AlertDialog open={!!revokeTarget} onOpenChange={(o) => !o && setRevokeTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <UserX className="size-4 text-destructive" /> ¿Salir de este secreto?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-xs leading-relaxed">
+              Tu acceso a este secreto compartido será revocado en el servidor. Ya no aparecerá en
+              tu bóveda ni podrás descifrarlo.
+              <br /><br />
+              El owner puede volver a compartírtelo en el futuro si es necesario.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busyAction}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmRevoke}
+              disabled={busyAction}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {busyAction ? <Loader2 className="mr-2 size-4 animate-spin" /> : <UserX className="mr-2 size-4" />}
+              Salir del secreto
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+function SecretGrid({
+  items,
+  loading,
+  onOpen,
+  onShare,
+  onDelete,
+  onLeave,
+  shareable = true,
+  emptyHint,
+}: {
+  items: SecretListItem[];
+  loading: boolean;
+  onOpen: (s: SecretListItem) => void;
+  onShare: (s: SecretListItem) => void;
+  onDelete?: (s: SecretListItem) => void;
+  onLeave?: (s: SecretListItem) => void;
+  shareable?: boolean;
+  emptyHint: string;
+}) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-border/40 p-8 text-xs text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" /> Cargando secretos…
+      </div>
+    );
+  }
+  if (items.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border/40 p-8 text-center">
+        <Inbox className="size-6 text-muted-foreground/60" />
+        <p className="text-xs text-muted-foreground">{emptyHint}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {items.map((s) => (
+        <Card key={s.id} className="bg-card/60 transition-colors hover:bg-card/80">
+          <CardContent className="space-y-3 p-4">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Lock className="size-3.5 text-primary" />
+                <code className="font-mono">#{s.id.slice(-8)}</code>
+              </div>
+              {s.ownedByMe ? (
+                <Badge variant="outline" className="border-primary/40 bg-primary/10 text-[10px] text-primary">
+                  Propio
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-500">
+                  Compartido
+                </Badge>
+              )}
+            </div>
+
+            <div>
+              <p className="text-xs text-muted-foreground">Título cifrado (no legible por el server):</p>
+              <p className="mt-1 truncate font-mono text-[11px] text-foreground/70" title={s.encryptedTitle}>
+                {s.encryptedTitle.slice(0, 48)}…
+              </p>
+            </div>
+
+            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+              <Clock className="size-3" />
+              {new Date(s.createdAt).toLocaleString("es-ES", {
+                day: "2-digit",
+                month: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <Button size="sm" variant="default" className="h-7 flex-1 text-xs" onClick={() => onOpen(s)}>
+                <Eye className="mr-1.5 size-3" /> Descifrar
+              </Button>
+              {shareable ? (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 flex-1 text-xs"
+                    onClick={() => onShare(s)}
+                  >
+                    <Share2 className="mr-1.5 size-3" /> Compartir
+                  </Button>
+                  {onDelete ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => onDelete(s)}
+                      title="Borrar secreto"
+                    >
+                      <Trash2 className="size-3" />
+                    </Button>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <div className="flex-1 truncate text-[10px] text-muted-foreground" title={s.ownerEmail}>
+                    de {s.ownerEmail}
+                  </div>
+                  {onLeave ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => onLeave(s)}
+                      title="Salir de este secreto"
+                    >
+                      <UserX className="size-3" />
+                    </Button>
+                  ) : null}
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+----- fin del archivo -----
+
+
