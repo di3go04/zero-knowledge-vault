@@ -14,6 +14,8 @@
  * =====================================================================
  */
 
+import { env } from "@/lib/env";
+
 interface RateLimitEntry {
   attempts: number[];
 }
@@ -32,7 +34,7 @@ let _store: RateLimitStore | null = null;
 async function getStore(): Promise<RateLimitStore> {
   if (_store) return _store;
 
-  const redisUrl = process.env.REDIS_URL;
+  const redisUrl = env.REDIS_URL;
   if (redisUrl) {
     try {
       const ioredisModule: any = await import("ioredis").catch(() => null);

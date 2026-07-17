@@ -1,10 +1,12 @@
+import { env } from "@/lib/env";
+
 export function getWebAuthnConfig(): {
   rpName: string;
   rpId: string;
   origin: string;
 } {
-  const rpName = process.env.WEBAUTHN_RP_NAME || "Zero-Knowledge Vault";
-  const origins = (process.env.WEBAUTHN_ORIGINS || "http://localhost:3000").split(",");
+  const rpName = env.WEBAUTHN_RP_NAME;
+  const origins = env.WEBAUTHN_ORIGINS.split(",");
   const origin = origins[0].trim();
   const rpId = new URL(origin).hostname;
   return { rpName, rpId, origin };

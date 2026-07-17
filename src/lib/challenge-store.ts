@@ -14,6 +14,8 @@
  * =====================================================================
  */
 
+import { env } from "@/lib/env";
+
 interface ChallengeEntry {
   challenge: string; // base64
   expiresAt: number; // epoch ms
@@ -53,7 +55,7 @@ if (typeof setInterval !== "undefined") {
 async function getStore(): Promise<ChallengeStore> {
   if (_store) return _store;
 
-  const redisUrl = process.env.REDIS_URL;
+  const redisUrl = env.REDIS_URL;
   if (redisUrl) {
     try {
       const ioredisModule: any = await import("ioredis").catch(() => null);

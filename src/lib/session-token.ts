@@ -21,8 +21,9 @@
  * =====================================================================
  */
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { env } from "@/lib/env";
 
-const SESSION_SECRET = process.env.SESSION_SECRET;
+const SESSION_SECRET = env.SESSION_SECRET;
 if (!SESSION_SECRET || SESSION_SECRET.length < 32) {
   throw new Error(
     "SESSION_SECRET environment variable is required (min 32 chars). " +
@@ -70,7 +71,7 @@ let _redisHealthOk = true; // Health flag — se resetea en errores, se restaura
 async function getBlacklistAdapter(): Promise<BlacklistAdapter> {
   if (_adapter) return _adapter;
 
-  const redisUrl = process.env.REDIS_URL;
+  const redisUrl = env.REDIS_URL;
   if (redisUrl) {
     try {
       const ioredisModule: any = await import("ioredis").catch(() => null);

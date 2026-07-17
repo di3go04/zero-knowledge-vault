@@ -1,6 +1,7 @@
 import { session } from "./session";
+import { env } from "@/lib/env";
 
-const API_ORIGIN = process.env.VAULT_API_URL ?? "http://localhost:3000";
+const API_ORIGIN = env.VAULT_API_URL;
 
 async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = session.load();

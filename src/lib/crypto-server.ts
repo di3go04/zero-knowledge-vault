@@ -14,6 +14,7 @@
  * =====================================================================
  */
 import { webcrypto, createHmac } from "node:crypto";
+import { env } from "@/lib/env";
 
 // Web Crypto está disponible en Node 18+ como global, pero en algunos
 // runtimes (Edge) conviene referenciarlo explícitamente.
@@ -201,7 +202,7 @@ export async function verifyPopSignature(params: {
  * un error de tag GCM inválido — idéntico al comportamiento cuando
  * un usuario real introduce su contraseña maestra incorrecta.
  */
-const DECOY_HMAC_KEY_ENV = process.env.DECOY_HMAC_KEY;
+const DECOY_HMAC_KEY_ENV = env.DECOY_HMAC_KEY;
 if (!DECOY_HMAC_KEY_ENV) {
   throw new Error(
     "DECOY_HMAC_KEY environment variable is required. " +
@@ -212,7 +213,7 @@ if (!DECOY_HMAC_KEY_ENV) {
 function hmacSha256(input: string): Uint8Array {
   // createHmac es sincrono y compatible con todos los runtimes Node.
   // Usamos la importación estática al inicio del archivo (createHmac).
-  const h = createHmac("sha256", DECOY_HMAC_KEY_ENV).update(input).digest();
+  const h = createHmac("sha256", DECOY_HMAC_KEY_ENV!).update(input).digest();
   return new Uint8Array(h);
 }
 

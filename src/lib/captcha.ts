@@ -4,6 +4,8 @@
  * Configura con TURNSTILE_SECRET_KEY o HCAPTCHA_SECRET_KEY en .env
  */
 
+import { env } from "@/lib/env";
+
 const TURNSTILE_VERIFY = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 const HCAPTCHA_VERIFY = "https://hcaptcha.com/siteverify";
 
@@ -11,8 +13,8 @@ export type CaptchaProvider = "turnstile" | "hcaptcha";
 
 export async function verifyCaptcha(token: string, provider: CaptchaProvider = "turnstile"): Promise<boolean> {
   const secretKey = provider === "turnstile"
-    ? process.env.TURNSTILE_SECRET_KEY
-    : process.env.HCAPTCHA_SECRET_KEY;
+    ? env.TURNSTILE_SECRET_KEY
+    : env.HCAPTCHA_SECRET_KEY;
 
   if (!secretKey) return true;
 
