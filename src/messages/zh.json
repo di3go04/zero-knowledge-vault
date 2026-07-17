@@ -1,35 +1,35 @@
 {
   "app": {
     "title": "Zero-Knowledge Vault",
-    "subtitle": "Team password manager · end-to-end encrypted in the browser"
+    "subtitle": "团队密码管理器 · 浏览器端到端加密"
   },
   "nav": {
-    "architecture": "Architecture",
-    "vault": "Demo Vault"
+    "architecture": "架构",
+    "vault": "演示保险库"
   },
   "auth": {
-    "login": "Log in",
-    "register": "Register",
-    "logout": "Log out",
-    "email": "Email",
-    "masterPassword": "Master password",
-    "loginTitle": "Access your encrypted vault"
+    "login": "登录",
+    "register": "注册",
+    "logout": "退出",
+    "email": "邮箱",
+    "masterPassword": "主密码",
+    "loginTitle": "访问您的加密保险库"
   },
   "vault": {
-    "title": "Vault",
-    "noSecrets": "No secrets",
-    "createSecret": "New secret",
-    "search": "Search secrets...",
-    "share": "Share",
-    "rotate": "Rotate password",
-    "delete": "Delete"
+    "title": "保险库",
+    "noSecrets": "没有秘密",
+    "createSecret": "新建秘密",
+    "search": "搜索秘密...",
+    "share": "分享",
+    "rotate": "轮换密码",
+    "delete": "删除"
   },
   "common": {
-    "loading": "Loading...",
-    "error": "Error",
-    "save": "Save",
-    "cancel": "Cancel",
-    "confirm": "Confirm",
-    "close": "Close"
+    "loading": "加载中...",
+    "error": "错误",
+    "save": "保存",
+    "cancel": "取消",
+    "confirm": "确认",
+    "close": "关闭"
   }
 }

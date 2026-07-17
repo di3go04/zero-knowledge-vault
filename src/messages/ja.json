@@ -1,35 +1,35 @@
 {
   "app": {
     "title": "Zero-Knowledge Vault",
-    "subtitle": "Team password manager · end-to-end encrypted in the browser"
+    "subtitle": "チームパスワードマネージャー · ブラウザでエンドツーエンド暗号化"
   },
   "nav": {
-    "architecture": "Architecture",
-    "vault": "Demo Vault"
+    "architecture": "アーキテクチャ",
+    "vault": "デモ保管庫"
   },
   "auth": {
-    "login": "Log in",
-    "register": "Register",
-    "logout": "Log out",
-    "email": "Email",
-    "masterPassword": "Master password",
-    "loginTitle": "Access your encrypted vault"
+    "login": "ログイン",
+    "register": "登録",
+    "logout": "ログアウト",
+    "email": "メールアドレス",
+    "masterPassword": "マスターパスワード",
+    "loginTitle": "暗号化された保管庫にアクセス"
   },
   "vault": {
-    "title": "Vault",
-    "noSecrets": "No secrets",
-    "createSecret": "New secret",
-    "search": "Search secrets...",
-    "share": "Share",
-    "rotate": "Rotate password",
-    "delete": "Delete"
+    "title": "保管庫",
+    "noSecrets": "秘密はありません",
+    "createSecret": "新しい秘密を作成",
+    "search": "秘密を検索...",
+    "share": "共有",
+    "rotate": "パスワードをローテート",
+    "delete": "削除"
   },
   "common": {
-    "loading": "Loading...",
-    "error": "Error",
-    "save": "Save",
-    "cancel": "Cancel",
-    "confirm": "Confirm",
-    "close": "Close"
+    "loading": "読み込み中...",
+    "error": "エラー",
+    "save": "保存",
+    "cancel": "キャンセル",
+    "confirm": "確認",
+    "close": "閉じる"
   }
 }

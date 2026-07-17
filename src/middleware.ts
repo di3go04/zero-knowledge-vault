@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import createIntlMiddleware from "next-intl/middleware";
 import { extractUserIdFromAuth } from "@/lib/session-token";
+import { locales, defaultLocale } from "@/lib/i18n";
 
 const publicPaths = [
   "/api/auth/login",
@@ -31,8 +33,18 @@ function isPublicPath(pathname: string): boolean {
   return publicPrefixes.some((prefix) => pathname.startsWith(prefix));
 }
 
+const intlMiddleware = createIntlMiddleware({
+  locales,
+  defaultLocale,
+  localePrefix: "as-needed",
+});
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  if (!pathname.startsWith("/api")) {
+    return intlMiddleware(req);
+  }
 
   if (isPublicPath(pathname)) {
     return NextResponse.next();
@@ -55,5 +67,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: "/api/:path*",
+  matcher: ["/((?!_next|_vercel|.*\\..*).*)"],
 };

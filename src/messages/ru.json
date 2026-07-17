@@ -1,35 +1,35 @@
 {
   "app": {
     "title": "Zero-Knowledge Vault",
-    "subtitle": "Team password manager · end-to-end encrypted in the browser"
+    "subtitle": "Командный менеджер паролей · сквозное шифрование в браузере"
   },
   "nav": {
-    "architecture": "Architecture",
-    "vault": "Demo Vault"
+    "architecture": "Архитектура",
+    "vault": "Демо-хранилище"
   },
   "auth": {
-    "login": "Log in",
-    "register": "Register",
-    "logout": "Log out",
-    "email": "Email",
-    "masterPassword": "Master password",
-    "loginTitle": "Access your encrypted vault"
+    "login": "Войти",
+    "register": "Зарегистрироваться",
+    "logout": "Выйти",
+    "email": "Эл. почта",
+    "masterPassword": "Мастер-пароль",
+    "loginTitle": "Доступ к вашему зашифрованному хранилищу"
   },
   "vault": {
-    "title": "Vault",
-    "noSecrets": "No secrets",
-    "createSecret": "New secret",
-    "search": "Search secrets...",
-    "share": "Share",
-    "rotate": "Rotate password",
-    "delete": "Delete"
+    "title": "Хранилище",
+    "noSecrets": "Нет секретов",
+    "createSecret": "Новый секрет",
+    "search": "Поиск секретов...",
+    "share": "Поделиться",
+    "rotate": "Сменить пароль",
+    "delete": "Удалить"
   },
   "common": {
-    "loading": "Loading...",
-    "error": "Error",
-    "save": "Save",
-    "cancel": "Cancel",
-    "confirm": "Confirm",
-    "close": "Close"
+    "loading": "Загрузка...",
+    "error": "Ошибка",
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "confirm": "Подтвердить",
+    "close": "Закрыть"
   }
 }

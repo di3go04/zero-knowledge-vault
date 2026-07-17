@@ -1,35 +1,35 @@
 {
   "app": {
     "title": "Zero-Knowledge Vault",
-    "subtitle": "Team password manager · end-to-end encrypted in the browser"
+    "subtitle": "Gerenciador de senhas para equipes · criptografia de ponta a ponta no navegador"
   },
   "nav": {
-    "architecture": "Architecture",
-    "vault": "Demo Vault"
+    "architecture": "Arquitetura",
+    "vault": "Cofre de demonstração"
   },
   "auth": {
-    "login": "Log in",
-    "register": "Register",
-    "logout": "Log out",
-    "email": "Email",
-    "masterPassword": "Master password",
-    "loginTitle": "Access your encrypted vault"
+    "login": "Entrar",
+    "register": "Registrar",
+    "logout": "Sair",
+    "email": "E-mail",
+    "masterPassword": "Senha mestra",
+    "loginTitle": "Acesse seu cofre criptografado"
   },
   "vault": {
-    "title": "Vault",
-    "noSecrets": "No secrets",
-    "createSecret": "New secret",
-    "search": "Search secrets...",
-    "share": "Share",
-    "rotate": "Rotate password",
-    "delete": "Delete"
+    "title": "Cofre",
+    "noSecrets": "Nenhum segredo",
+    "createSecret": "Novo segredo",
+    "search": "Pesquisar segredos...",
+    "share": "Compartilhar",
+    "rotate": "Rotacionar senha",
+    "delete": "Excluir"
   },
   "common": {
-    "loading": "Loading...",
-    "error": "Error",
-    "save": "Save",
-    "cancel": "Cancel",
-    "confirm": "Confirm",
-    "close": "Close"
+    "loading": "Carregando...",
+    "error": "Erro",
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "close": "Fechar"
   }
 }

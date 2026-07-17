@@ -1,35 +1,35 @@
 {
   "app": {
     "title": "Zero-Knowledge Vault",
-    "subtitle": "Team password manager · end-to-end encrypted in the browser"
+    "subtitle": "팀 비밀번호 관리자 · 브라우저에서 종단간 암호화"
   },
   "nav": {
-    "architecture": "Architecture",
-    "vault": "Demo Vault"
+    "architecture": "아키텍처",
+    "vault": "데모 보관소"
   },
   "auth": {
-    "login": "Log in",
-    "register": "Register",
-    "logout": "Log out",
-    "email": "Email",
-    "masterPassword": "Master password",
-    "loginTitle": "Access your encrypted vault"
+    "login": "로그인",
+    "register": "회원가입",
+    "logout": "로그아웃",
+    "email": "이메일",
+    "masterPassword": "마스터 비밀번호",
+    "loginTitle": "암호화된 보관소에 접속"
   },
   "vault": {
-    "title": "Vault",
-    "noSecrets": "No secrets",
-    "createSecret": "New secret",
-    "search": "Search secrets...",
-    "share": "Share",
-    "rotate": "Rotate password",
-    "delete": "Delete"
+    "title": "보관소",
+    "noSecrets": "비밀이 없습니다",
+    "createSecret": "새 비밀 생성",
+    "search": "비밀 검색...",
+    "share": "공유",
+    "rotate": "비밀번호 순환",
+    "delete": "삭제"
   },
   "common": {
-    "loading": "Loading...",
-    "error": "Error",
-    "save": "Save",
-    "cancel": "Cancel",
-    "confirm": "Confirm",
-    "close": "Close"
+    "loading": "로딩 중...",
+    "error": "오류",
+    "save": "저장",
+    "cancel": "취소",
+    "confirm": "확인",
+    "close": "닫기"
   }
 }

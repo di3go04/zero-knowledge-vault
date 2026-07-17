@@ -1,0 +1,2537 @@
+openapi: "3.0.3"
+info:
+  title: Zero-Knowledge Vault API
+  version: "0.2.0"
+  description: |
+    Zero-Knowledge Vault is a cryptographic secrets manager where the server
+    never has access to plaintext secrets. All encryption, decryption, and key
+    derivation happens client-side. The server only stores encrypted blobs and
+    verifies cryptographic proofs-of-possession.
+
+    **Security Model:**
+    - Bearer token authentication (HS256 JWT, 1-hour TTL)
+    - Proof-of-Possession (RSA-PSS) on registration and rotation
+    - Decoy responses prevent email enumeration on login
+    - Rate limiting on auth, enrollment, and verification endpoints
+    - All secrets are AES-256-GCM encrypted blobs — server is crypto-blind
+    - Shamir Secret Sharing is not used; simple RSA-OAEP wrapping instead
+
+    **Authentication:**
+    Most endpoints require `Authorization: Bearer <sessionToken>` header.
+    The session token is obtained via `POST /api/auth/login` or
+    `POST /api/auth/webauthn/login/complete`.
+  contact:
+    name: Zero-Knowledge Vault Team
+  license:
+    name: MIT
+servers:
+  - url: http://localhost:3000
+    description: Local development
+  - url: https://vault.example.com
+    description: Production
+
+paths:
+  # ============================================================================
+  # Auth
+  # ============================================================================
+  /api/auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new account
+      description: |
+        Creates a new user account with Proof-of-Possession (RSA-PSS).
+        The client generates an RSA key pair, encrypts the private key with the
+        master password, and signs a PoP message to prove possession of the
+        private key. The server never sees plaintext keys or passwords.
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Account created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          description: Proof-of-Possession verification failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Proof-of-Possession inválida: la firma RSA-PSS no corresponde a la publicKey declarada."
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "El email ya está registrado"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /api/auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login
+      description: |
+        Authenticate with email. Returns the user's encrypted key material and a
+        session token. If the email does not exist, returns a decoy response
+        (same structure, undecryptable) to prevent email enumeration.
+        Rate-limited: 5 attempts per 15 min per IP+email.
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login response (real or decoy)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /api/auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout and revoke session token
+      description: |
+        Revokes the current session token by adding its JTI to the server-side
+        blacklist with TTL equal to remaining expiration time. Idempotent —
+        returns 200 even if the token is already expired or revoked.
+      operationId: logout
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Logout result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogoutResponse"
+
+  /api/auth/rotate:
+    post:
+      tags:
+        - Authentication
+      summary: Rotate master password
+      description: |
+        Rotates the master password by re-encrypting the same RSA private key
+        with a new key derived from the new password. Requires a new PoP
+        signature using the existing public key to prove possession of the
+        private key. The public key does NOT change — existing wrapped keys
+        and shares remain valid.
+      operationId: rotate
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RotateRequest"
+      responses:
+        "200":
+          description: Master password rotated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RotateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: PoP verification failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /api/auth/rotation-status:
+    get:
+      tags:
+        - Authentication
+      summary: Check if key rotation is needed
+      description: |
+        Returns the timestamp of the last key rotation for the authenticated
+        user. Clients can use this to enforce periodic rotation policies.
+      operationId: getRotationStatus
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Rotation status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RotationStatusResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /api/auth/recovery/setup:
+    post:
+      tags:
+        - Recovery
+      summary: Set up BIP-39 recovery backup
+      description: |
+        Stores an encrypted backup of the RSA private key that can be
+        recovered using a BIP-39 mnemonic phrase. The backup is encrypted
+        with a key derived from the mnemonic. Requires authentication.
+      operationId: setupRecovery
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecoverySetupRequest"
+      responses:
+        "200":
+          description: Recovery backup configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecoverySetupResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /api/auth/recovery/recover:
+    post:
+      tags:
+        - Recovery
+      summary: Recover account with BIP-39 mnemonic
+      description: |
+        Two-step recovery flow. First call with `action: "get-blob"` to
+        retrieve the encrypted recovery blob. Then decrypt client-side with
+        the BIP-39 mnemonic, re-encrypt with a new master password, and call
+        with `action: "complete"` to finalize recovery.
+      operationId: recoverAccount
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecoveryRecoverRequest"
+      responses:
+        "200":
+          description: Recovery blob or completion result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecoveryRecoverResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          description: PoP verification failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  # ============================================================================
+  # WebAuthn
+  # ============================================================================
+  /api/auth/webauthn/register/begin:
+    post:
+      tags:
+        - WebAuthn
+      summary: Start WebAuthn credential registration
+      description: |
+        Generates WebAuthn registration options (challenge, RP info, etc.)
+        for the authenticated user. The client uses these to create a new
+        credential via the WebAuthn browser API.
+      operationId: webauthnRegisterBegin
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: WebAuthn registration options (PublicKeyCredentialCreationOptions)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebAuthnRegistrationOptions"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/auth/webauthn/register/complete:
+    post:
+      tags:
+        - WebAuthn
+      summary: Complete WebAuthn credential registration
+      description: |
+        Verifies the WebAuthn registration response and stores the new
+        credential for the authenticated user.
+      operationId: webauthnRegisterComplete
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebAuthnRegisterCompleteRequest"
+      responses:
+        "200":
+          description: Registration verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebAuthnRegisterCompleteResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/auth/webauthn/login/begin:
+    post:
+      tags:
+        - WebAuthn
+      summary: Start WebAuthn authentication
+      description: |
+        Generates WebAuthn authentication options (challenge, allowCredentials)
+        for a user identified by email. Does NOT require prior authentication.
+      operationId: webauthnLoginBegin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebAuthnLoginBeginRequest"
+      responses:
+        "200":
+          description: WebAuthn authentication options (PublicKeyCredentialRequestOptions)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  challenge:
+                    type: string
+                    description: Base64url-encoded challenge
+                  allowCredentials:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/WebAuthnAllowCredential"
+                  userId:
+                    type: string
+                    description: User ID for the complete step
+                  userVerification:
+                    type: string
+                example:
+                  challenge: "AACJzZQAAAA"
+                  allowCredentials:
+                    - id: "webauthn-cred-id-1"
+                      type: "public-key"
+                      transports: ["internal", "usb"]
+                  userId: "user_abc123"
+                  userVerification: "preferred"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          description: No WebAuthn credentials found for this user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/auth/webauthn/login/complete:
+    post:
+      tags:
+        - WebAuthn
+      summary: Complete WebAuthn authentication
+      description: |
+        Verifies the WebAuthn authentication response and issues a session
+        token if successful. Returns the user's encrypted key material
+        alongside the session token.
+      operationId: webauthnLoginComplete
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebAuthnLoginCompleteRequest"
+      responses:
+        "200":
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebAuthnLoginCompleteResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/auth/webauthn/credentials:
+    get:
+      tags:
+        - WebAuthn
+      summary: List WebAuthn credentials
+      description: Returns all WebAuthn credentials registered to the authenticated user.
+      operationId: listWebAuthnCredentials
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: List of credentials
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WebAuthnCredential"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    delete:
+      tags:
+        - WebAuthn
+      summary: Delete a WebAuthn credential
+      description: |
+        Deletes a WebAuthn credential by ID. Only the owning user can
+        delete their own credentials.
+      operationId: deleteWebAuthnCredential
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: query
+          required: true
+          description: Credential ID to delete
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Credential deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+                    example: true
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ============================================================================
+  # Secrets
+  # ============================================================================
+  /api/secrets:
+    get:
+      tags:
+        - Secrets
+      summary: List secrets
+      description: |
+        Lists all secrets owned by or shared with the authenticated user.
+        Returns only encrypted blobs — the server never sees plaintext.
+        Supports pagination via `offset` and `limit` query params.
+      operationId: listSecrets
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Number of items to skip
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+          description: Maximum items to return (max 100)
+      responses:
+        "200":
+          description: Paginated list of secrets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecretListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+    post:
+      tags:
+        - Secrets
+      summary: Create a secret
+      description: |
+        Creates a new encrypted secret. All fields are client-encrypted blobs.
+        The server cannot read the title, data, or metadata. A wrapped key
+        share is created for the owner automatically.
+      operationId: createSecret
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SecretCreateRequest"
+      responses:
+        "201":
+          description: Secret created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecretCreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /api/secrets/{id}:
+    delete:
+      tags:
+        - Secrets
+      summary: Delete a secret
+      description: |
+        Permanently deletes a secret and all associated key shares.
+        Only the owner can delete a secret. Returns 404 (not 403) for
+        non-owners to avoid revealing secret existence.
+      operationId: deleteSecret
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-zA-Z0-9_-]+$"
+          description: Secret ID
+      responses:
+        "200":
+          description: Secret deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteSecretResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  # ============================================================================
+  # Shares
+  # ============================================================================
+  /api/shares:
+    post:
+      tags:
+        - Shares
+      summary: Share a secret with another user
+      description: |
+        Creates or updates a key share for a secret. The owner wraps the
+        symmetric AES key with the recipient's RSA public key and sends
+        the wrapped key to the server. The server stores it blindly.
+        Only the secret owner can create shares.
+      operationId: createShare
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShareCreateRequest"
+      responses:
+        "200":
+          description: Share created or updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareCreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Only the owner can share this secret
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+    delete:
+      tags:
+        - Shares
+      summary: Revoke a share
+      description: |
+        Revokes a user's access to a secret. Two modes:
+        - Owner revokes a recipient (offboarding)
+        - Recipient performs a self-leave
+        Only the owner can revoke other users. Recipients can only revoke
+        themselves. The owner cannot revoke their own access.
+      operationId: revokeShare
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShareRevokeRequest"
+      responses:
+        "200":
+          description: Share revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareRevokeResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Permission denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  # ============================================================================
+  # Devices
+  # ============================================================================
+  /api/devices/enroll/init:
+    post:
+      tags:
+        - Devices
+      summary: Initiate device enrollment
+      description: |
+        Starts the enrollment flow for a new device. The new device (B)
+        registers its ECDH public key and receives a 6-digit enrollment code.
+        No authentication required. Rate-limited to prevent spam.
+      operationId: enrollDeviceInit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnrollInitRequest"
+      responses:
+        "200":
+          description: Enrollment initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnrollInitResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /api/devices/enroll/lookup:
+    get:
+      tags:
+        - Devices
+      summary: Lookup enrollment code
+      description: |
+        Used by the already-authenticated device (A) to look up the
+        new device's (B) ECDH public key by enrollment code.
+        This allows device A to wrap the private key for device B.
+      operationId: lookupEnrollmentCode
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: "^\\d{6}$"
+          description: 6-digit enrollment code
+      responses:
+        "200":
+          description: Device details for enrollment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnrollLookupResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /api/devices/enroll/complete:
+    post:
+      tags:
+        - Devices
+      summary: Complete device enrollment
+      description: |
+        The authenticated device (A) provides the wrapped RSA private key
+        encrypted for device B's ECDH key. The server stores the wrapped
+        key and clears the enrollment code.
+      operationId: enrollDeviceComplete
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnrollCompleteRequest"
+      responses:
+        "200":
+          description: Device enrolled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnrollCompleteResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Enrollment code belongs to a different user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /api/devices/enroll/poll:
+    post:
+      tags:
+        - Devices
+      summary: Poll for enrollment challenge
+      description: |
+        The new device (B) polls this endpoint to check if enrollment was
+        completed and to receive a cryptographic challenge (32-byte nonce).
+        The challenge must be signed with the device's ECDH private key
+        and verified via `/api/devices/enroll/poll/verify`.
+      operationId: enrollDevicePoll
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnrollPollRequest"
+      responses:
+        "200":
+          description: Poll result (enrolled status or challenge)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnrollPollResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          description: Device revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /api/devices/enroll/poll/verify:
+    post:
+      tags:
+        - Devices
+      summary: Verify challenge and retrieve wrapped private key
+      description: |
+        The new device (B) submits its signed challenge to prove possession
+        of the ECDH private key. If the signature verifies, the server
+        returns the wrapped RSA private key and associated material.
+        Challenge is one-time use. Rate-limited to 5 attempts/min.
+      operationId: enrollDeviceVerify
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnrollVerifyRequest"
+      responses:
+        "200":
+          description: Challenge verified, wrapped private key returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnrollVerifyResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          description: Challenge verification failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /api/devices/list:
+    get:
+      tags:
+        - Devices
+      summary: List authorized devices
+      description: |
+        Lists all non-revoked devices registered to the authenticated user.
+        Supports pagination.
+      operationId: listDevices
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        "200":
+          description: Paginated list of devices
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /api/devices/{id}:
+    delete:
+      tags:
+        - Devices
+      summary: Revoke a device
+      description: |
+        Revokes a device by marking it as revoked (soft delete for audit).
+        The device can no longer poll or decrypt new data. If the device
+        had a local copy of the private key, the user should also rotate
+        their master password to invalidate it.
+      operationId: revokeDevice
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-zA-Z0-9_-]+$"
+          description: Device ID
+      responses:
+        "200":
+          description: Device revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevokeDeviceResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  # ============================================================================
+  # Users
+  # ============================================================================
+  /api/users/lookup:
+    get:
+      tags:
+        - Users
+      summary: Lookup user by email
+      description: |
+        Looks up a user's public key and fingerprint by email. This is
+        needed to wrap symmetric keys with the recipient's RSA public key
+        before sharing. No authentication required (public keys are public).
+      operationId: lookupUser
+      parameters:
+        - name: email
+          in: query
+          required: true
+          schema:
+            type: string
+            format: email
+          description: User email address
+      responses:
+        "200":
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserLookupResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /api/users/list:
+    get:
+      tags:
+        - Users
+      summary: List team users
+      description: |
+        Lists all registered users (excluding the authenticated user).
+        Returns ID, email, name, and public key fingerprint for each user.
+      operationId: listUsers
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  # ============================================================================
+  # Audit Logs
+  # ============================================================================
+  /api/audit-logs:
+    get:
+      tags:
+        - Audit Logs
+      summary: List audit logs
+      description: |
+        Returns encrypted audit log entries for the authenticated user.
+        Logs form an immutable hash chain (each entry references the SHA-256
+        of the previous entry's ciphertext). Supports filtering by category.
+      operationId: listAuditLogs
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum:
+              - auth
+              - secret
+              - share
+              - device
+              - recovery
+          description: Filter by event category
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 100
+          description: Maximum number of logs to return
+      responses:
+        "200":
+          description: List of audit logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+    post:
+      tags:
+        - Audit Logs
+      summary: Create an audit log entry
+      description: |
+        Creates a new encrypted audit log entry. The client encrypts the
+        event details with AES-256-GCM using a key derived from the master
+        key. The server links it into an immutable hash chain.
+      operationId: createAuditLog
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuditLogCreateRequest"
+      responses:
+        "201":
+          description: Audit log created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogCreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  # ============================================================================
+  # Emergency Access
+  # ============================================================================
+  /api/emergency-access:
+    post:
+      tags:
+        - Emergency Access
+      summary: Create an emergency access grant
+      description: |
+        Grants emergency access to another user. The grant has a configurable
+        time-lock delay (default 72 hours). The beneficiary must wait for the
+        delay to expire before recovering the grantor's encrypted private key.
+      operationId: createEmergencyAccessGrant
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmergencyAccessCreateRequest"
+      responses:
+        "201":
+          description: Grant created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmergencyAccessCreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Beneficiary not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Emergency access grant already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+    get:
+      tags:
+        - Emergency Access
+      summary: List emergency access grants
+      description: |
+        Lists all emergency access grants where the authenticated user is
+        either the grantor or the beneficiary. Returns both active and
+        historical grants.
+      operationId: listEmergencyAccessGrants
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: List of grants
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmergencyAccessListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /api/emergency-access/{id}:
+    post:
+      tags:
+        - Emergency Access
+      summary: Claim, cancel, or recover via emergency grant
+      description: |
+        Performs an action on an emergency access grant:
+        - `claim`: Beneficiary initiates access (starts the time-lock delay)
+        - `cancel`: Grantor cancels a pending grant
+        - `recover`: Beneficiary recovers the encrypted private key after
+          the time-lock expires. Returns the recovery blob (same as the
+          BIP-39 recovery flow).
+      operationId: handleEmergencyAccess
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-zA-Z0-9_-]+$"
+          description: Emergency access grant ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmergencyAccessActionRequest"
+      responses:
+        "200":
+          description: Action completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmergencyAccessActionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Not authorized to perform this action
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "423":
+          description: Time-lock not yet expired
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  remainingSeconds:
+                    type: integer
+                example:
+                  error: "Time-lock not expired. 3600s remaining."
+                  remainingSeconds: 3600
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+    delete:
+      tags:
+        - Emergency Access
+      summary: Cancel an emergency access grant
+      description: |
+        Cancels a pending emergency access grant. Only the grantor can cancel.
+        This is a convenience alias for `POST .../emergency-access/{id}`
+        with `action: "cancel"`.
+      operationId: cancelEmergencyAccessGrant
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-zA-Z0-9_-]+$"
+          description: Emergency access grant ID
+      responses:
+        "200":
+          description: Grant cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "cancelled"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Only the grantor can cancel
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        HS256-signed JWT session token. Obtained from
+        `POST /api/auth/login` or `POST /api/auth/webauthn/login/complete`.
+        Tokens expire after 1 hour and can be revoked server-side via logout.
+        Include as: `Authorization: Bearer <sessionToken>`
+
+  schemas:
+    # -------------------------------------------------------------------------
+    # Auth
+    # -------------------------------------------------------------------------
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - kdfAlgorithm
+        - kdfSalt
+        - kdfIterations
+        - publicKeyJwk
+        - publicKeyFingerprint
+        - popSignature
+        - encryptedPrivateKeyJwk
+        - privateKeyIv
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+          description: User email address
+          example: "alice@example.com"
+        name:
+          type: string
+          maxLength: 100
+          description: Optional display name
+          example: "Alice"
+        kdfAlgorithm:
+          type: string
+          enum:
+            - argon2id
+            - pbkdf2
+          description: Key derivation function algorithm
+        kdfSalt:
+          type: string
+          description: "Base64-encoded salt (16-64 bytes)"
+          example: "a3NuU2FsdFZhbHVlMTIzNA=="
+        kdfIterations:
+          type: integer
+          minimum: 310000
+          maximum: 10000000
+          description: KDF iteration count
+          example: 600000
+        kdfMemoryKiB:
+          type: integer
+          minimum: 16384
+          maximum: 1048576
+          description: "Memory cost in KiB (argon2id only)"
+          example: 65536
+        kdfParallelism:
+          type: integer
+          minimum: 1
+          maximum: 16
+          description: "Parallelism factor (argon2id only)"
+          example: 4
+        publicKeyJwk:
+          type: object
+          description: RSA public key in JWK format
+          required:
+            - kty
+            - n
+            - e
+          properties:
+            kty:
+              type: string
+              enum:
+                - RSA
+            n:
+              type: string
+              description: Base64url-encoded modulus
+            e:
+              type: string
+              description: Base64url-encoded exponent
+            ext:
+              type: boolean
+            key_ops:
+              type: array
+              items:
+                type: string
+            alg:
+              type: string
+        publicKeyFingerprint:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: "SHA-256 fingerprint of the canonicalized public key JWK"
+          example: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b"
+        popSignature:
+          type: string
+          description: "Base64-encoded RSA-PSS signature over PoP message: `zk-vault-pop-v1\\nemail=...\\nfingerprint=...\\nsalt=...`"
+          example: "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyMzQ1Njc4OTA..."
+        encryptedPrivateKeyJwk:
+          type: string
+          description: "AES-256-GCM encrypted RSA private key JWK (base64, 28-65536 bytes)"
+          example: "QUVTMjU2LUdDTS1jaXBoZXJ0ZXh0..."
+        privateKeyIv:
+          type: string
+          description: "Base64-encoded IV for private key encryption (exactly 12 bytes)"
+          example: "MTIzNDU2Nzg5MDEy"
+
+    RegisterResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+          description: Newly created user ID
+          example: "cm9vdF9hYmMxMjM0"
+        email:
+          type: string
+          format: email
+          example: "alice@example.com"
+        name:
+          type: string
+          nullable: true
+          example: "Alice"
+        publicKeyFingerprint:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        createdAt:
+          type: string
+          format: date-time
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+          example: "alice@example.com"
+
+    LoginResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+          example: "user_abc123"
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          nullable: true
+        kdfAlgorithm:
+          type: string
+          enum:
+            - argon2id
+            - pbkdf2
+        kdfSalt:
+          type: string
+          description: Base64-encoded KDF salt
+        kdfIterations:
+          type: integer
+        kdfMemoryKiB:
+          type: integer
+          nullable: true
+          description: Memory cost in KiB (null for PBKDF2)
+        kdfParallelism:
+          type: integer
+          nullable: true
+          description: Parallelism factor (null for PBKDF2)
+        encryptedPrivateKeyJwk:
+          type: string
+          description: AES-256-GCM encrypted RSA private key
+        privateKeyIv:
+          type: string
+          description: Base64-encoded IV (12 bytes)
+        publicKeyJwk:
+          type: object
+          description: RSA public key in JWK format
+        publicKeyFingerprint:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        sessionToken:
+          type: string
+          nullable: true
+          description: "JWT session token (null for decoy responses)"
+        expiresAt:
+          type: integer
+          nullable: true
+          description: "Session token expiration UNIX timestamp (null for decoy)"
+        isDecoy:
+          type: boolean
+          description: "True if this is a decoy response for a non-existent email"
+          example: false
+
+    LogoutResponse:
+      type: object
+      properties:
+        loggedOut:
+          type: boolean
+          example: true
+        jti:
+          type: string
+          description: JWT ID of the revoked token
+        ttlSeconds:
+          type: integer
+          description: Remaining TTL of the revoked token
+        note:
+          type: string
+
+    RotateRequest:
+      type: object
+      required:
+        - newKdfAlgorithm
+        - newKdfSalt
+        - newKdfIterations
+        - newEncryptedPrivateKeyJwk
+        - newPrivateKeyIv
+        - newPopSignature
+      properties:
+        newKdfAlgorithm:
+          type: string
+          enum:
+            - argon2id
+            - pbkdf2
+        newKdfSalt:
+          type: string
+          description: Base64-encoded new KDF salt
+        newKdfIterations:
+          type: integer
+          minimum: 1
+          maximum: 10000000
+        newKdfMemoryKiB:
+          type: integer
+          minimum: 16384
+          maximum: 1048576
+        newKdfParallelism:
+          type: integer
+          minimum: 1
+          maximum: 16
+        newEncryptedPrivateKeyJwk:
+          type: string
+          description: Re-encrypted private key JWK (same key, new password)
+        newPrivateKeyIv:
+          type: string
+          description: Base64-encoded IV (12 bytes)
+        newPopSignature:
+          type: string
+          description: RSA-PSS signature proving possession of the existing private key
+
+    RotateResponse:
+      type: object
+      properties:
+        rotated:
+          type: boolean
+          example: true
+        userId:
+          type: string
+        newKdfAlgorithm:
+          type: string
+        newKdfSalt:
+          type: string
+        newKdfIterations:
+          type: integer
+        publicKeyFingerprint:
+          type: string
+          description: Unchanged (same RSA key pair)
+        note:
+          type: string
+
+    RotationStatusResponse:
+      type: object
+      properties:
+        lastKeyRotationAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: ISO 8601 timestamp of last rotation, or null if never rotated
+          example: "2025-06-15T10:30:00.000Z"
+
+    # -------------------------------------------------------------------------
+    # Recovery
+    # -------------------------------------------------------------------------
+    RecoverySetupRequest:
+      type: object
+      required:
+        - recoverySalt
+        - recoveryIterations
+        - encryptedPrivateKeyForRecovery
+        - recoveryIv
+      properties:
+        recoverySalt:
+          type: string
+          description: "Base64-encoded salt for recovery KDF (16-64 bytes)"
+        recoveryIterations:
+          type: integer
+          minimum: 100000
+          maximum: 10000000
+          description: Iteration count for recovery KDF
+        encryptedPrivateKeyForRecovery:
+          type: string
+          description: AES-256-GCM encrypted RSA private key (recovery copy)
+        recoveryIv:
+          type: string
+          description: Base64-encoded IV (12 bytes)
+
+    RecoverySetupResponse:
+      type: object
+      properties:
+        recoveryEnabled:
+          type: boolean
+          example: true
+        note:
+          type: string
+          example: "Backup de recuperación configurado. Guarda tus 24 palabras en un lugar seguro."
+
+    RecoveryRecoverRequest:
+      type: object
+      required:
+        - action
+        - email
+      properties:
+        action:
+          type: string
+          enum:
+            - get-blob
+            - complete
+          description: "Step of the recovery flow"
+        email:
+          type: string
+          format: email
+        newKdfAlgorithm:
+          type: string
+          enum:
+            - argon2id
+            - pbkdf2
+          description: "Required for action=complete"
+        newKdfSalt:
+          type: string
+          description: "Required for action=complete"
+        newKdfIterations:
+          type: integer
+          description: "Required for action=complete"
+        newKdfMemoryKiB:
+          type: integer
+        newKdfParallelism:
+          type: integer
+        newEncryptedPrivateKeyJwk:
+          type: string
+          description: "Required for action=complete"
+        newPrivateKeyIv:
+          type: string
+          description: "Required for action=complete"
+        newPopSignature:
+          type: string
+          description: "Required for action=complete"
+
+    RecoveryRecoverResponse:
+      type: object
+      properties:
+        recoveryEnabled:
+          type: boolean
+        recoverySalt:
+          type: string
+          description: "Returned for action=get-blob"
+        recoveryIterations:
+          type: integer
+          description: "Returned for action=get-blob"
+        encryptedPrivateKeyForRecovery:
+          type: string
+          description: "Returned for action=get-blob"
+        recoveryIv:
+          type: string
+          description: "Returned for action=get-blob"
+        isDecoy:
+          type: boolean
+          description: "True if the response is a decoy for anti-enumeration"
+        recovered:
+          type: boolean
+          description: "Returned for action=complete"
+        userId:
+          type: string
+          description: "Returned for action=complete"
+        email:
+          type: string
+          description: "Returned for action=complete"
+        note:
+          type: string
+
+    # -------------------------------------------------------------------------
+    # WebAuthn
+    # -------------------------------------------------------------------------
+    WebAuthnRegistrationOptions:
+      type: object
+      description: "PublicKeyCredentialCreationOptions as returned by @simplewebauthn/server"
+      properties:
+        challenge:
+          type: string
+        rp:
+          type: object
+          properties:
+            name:
+              type: string
+            id:
+              type: string
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            displayName:
+              type: string
+        pubKeyCredParams:
+          type: array
+          items:
+            type: object
+        timeout:
+          type: integer
+        excludeCredentials:
+          type: array
+        authenticatorSelection:
+          type: object
+        attestation:
+          type: string
+      example:
+        challenge: "AACJzZQAAAA"
+        rp:
+          name: "ZK Vault"
+          id: "localhost"
+        user:
+          id: "dXNlcl9pZA"
+          name: "alice@example.com"
+          displayName: "Alice"
+        pubKeyCredParams:
+          - type: "public-key"
+            alg: -7
+        timeout: 60000
+        attestation: "none"
+
+    WebAuthnRegisterCompleteRequest:
+      type: object
+      required:
+        - credential
+      properties:
+        credential:
+          type: object
+          description: "The WebAuthn registration response from the browser (PublicKeyCredential)"
+        deviceName:
+          type: string
+          maxLength: 100
+          description: Optional friendly name for the credential
+
+    WebAuthnRegisterCompleteResponse:
+      type: object
+      properties:
+        verified:
+          type: boolean
+          example: true
+        credentialId:
+          type: string
+          description: Stored credential ID
+
+    WebAuthnLoginBeginRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+
+    WebAuthnAllowCredential:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          example: "public-key"
+        transports:
+          type: array
+          items:
+            type: string
+
+    WebAuthnLoginCompleteRequest:
+      type: object
+      required:
+        - credential
+        - userId
+      properties:
+        credential:
+          type: object
+          description: "The WebAuthn authentication response from the browser (PublicKeyCredential)"
+        userId:
+          type: string
+          description: User ID from the login/begin response
+
+    WebAuthnLoginCompleteResponse:
+      type: object
+      properties:
+        verified:
+          type: boolean
+          example: true
+        userId:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+          nullable: true
+        sessionToken:
+          type: string
+          description: JWT session token
+        expiresAt:
+          type: integer
+        kdfAlgorithm:
+          type: string
+        kdfSalt:
+          type: string
+        kdfIterations:
+          type: integer
+        kdfMemoryKiB:
+          type: integer
+          nullable: true
+        kdfParallelism:
+          type: integer
+          nullable: true
+        encryptedPrivateKeyJwk:
+          type: string
+        privateKeyIv:
+          type: string
+        publicKeyJwk:
+          type: object
+          nullable: true
+
+    WebAuthnCredential:
+      type: object
+      properties:
+        id:
+          type: string
+        credentialId:
+          type: string
+        deviceName:
+          type: string
+        credentialType:
+          type: string
+          enum:
+            - platform
+            - cross-platform
+        createdAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    # -------------------------------------------------------------------------
+    # Secrets
+    # -------------------------------------------------------------------------
+    SecretCreateRequest:
+      type: object
+      required:
+        - encryptedTitle
+        - titleIv
+        - encryptedData
+        - dataIv
+        - wrappedKeyForOwner
+      properties:
+        encryptedTitle:
+          type: string
+          description: "AES-256-GCM encrypted title (base64, 28-65536 bytes)"
+        titleIv:
+          type: string
+          description: "Base64 IV for title encryption (exactly 12 bytes)"
+        encryptedData:
+          type: string
+          description: "AES-256-GCM encrypted secret data (base64, 28-65536 bytes)"
+        dataIv:
+          type: string
+          description: "Base64 IV for data encryption (exactly 12 bytes)"
+        wrappedKeyForOwner:
+          type: string
+          description: "RSA-OAEP-2048 wrapped AES key for the owner (exactly 256 bytes base64)"
+        secretType:
+          type: string
+          enum:
+            - password
+            - note
+            - ssh-key
+            - api-key
+            - certificate
+            - database
+          default: password
+        encryptedMetadata:
+          type: string
+          description: "Optional AES-256-GCM encrypted metadata (base64)"
+        metadataIv:
+          type: string
+          description: "Base64 IV for metadata encryption"
+
+    SecretCreateResponse:
+      type: object
+      properties:
+        secretId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    SecretListResponse:
+      type: object
+      properties:
+        secrets:
+          type: array
+          items:
+            $ref: "#/components/schemas/SecretItem"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    SecretItem:
+      type: object
+      properties:
+        id:
+          type: string
+        ownerId:
+          type: string
+        ownerEmail:
+          type: string
+        ownerName:
+          type: string
+          nullable: true
+        ownedByMe:
+          type: boolean
+        encryptedTitle:
+          type: string
+        titleIv:
+          type: string
+        encryptedData:
+          type: string
+        dataIv:
+          type: string
+        encryptedMetadata:
+          type: string
+          nullable: true
+        metadataIv:
+          type: string
+          nullable: true
+        secretType:
+          type: string
+        wrappedKey:
+          type: string
+          description: RSA-OAEP wrapped AES key for the current user
+        createdAt:
+          type: string
+          format: date-time
+        sharedAt:
+          type: string
+          format: date-time
+
+    DeleteSecretResponse:
+      type: object
+      properties:
+        secretId:
+          type: string
+        deleted:
+          type: boolean
+          example: true
+        note:
+          type: string
+
+    # -------------------------------------------------------------------------
+    # Shares
+    # -------------------------------------------------------------------------
+    ShareCreateRequest:
+      type: object
+      required:
+        - secretId
+        - recipientId
+        - wrappedSymmetricKey
+      properties:
+        secretId:
+          type: string
+          description: ID of the secret to share
+        recipientId:
+          type: string
+          description: ID of the recipient user
+        wrappedSymmetricKey:
+          type: string
+          description: "AES key wrapped with recipient's RSA public key (exactly 256 bytes base64)"
+
+    ShareCreateResponse:
+      type: object
+      properties:
+        shareId:
+          type: string
+        secretId:
+          type: string
+        recipientId:
+          type: string
+        recipientEmail:
+          type: string
+        recipientFingerprint:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    ShareRevokeRequest:
+      type: object
+      required:
+        - secretId
+        - recipientId
+      properties:
+        secretId:
+          type: string
+        recipientId:
+          type: string
+
+    ShareRevokeResponse:
+      type: object
+      properties:
+        secretId:
+          type: string
+        recipientId:
+          type: string
+        revoked:
+          type: boolean
+          example: true
+        mode:
+          type: string
+          enum:
+            - owner-revoke
+            - self-leave
+        note:
+          type: string
+
+    # -------------------------------------------------------------------------
+    # Devices
+    # -------------------------------------------------------------------------
+    EnrollInitRequest:
+      type: object
+      required:
+        - email
+        - deviceName
+        - publicKeyECDH
+        - publicKeyECDHFingerprint
+      properties:
+        email:
+          type: string
+          format: email
+        deviceName:
+          type: string
+          maxLength: 80
+        publicKeyECDH:
+          type: object
+          description: ECDH public key in JWK format (P-256)
+          required:
+            - kty
+            - crv
+            - x
+            - y
+          properties:
+            kty:
+              type: string
+              enum:
+                - EC
+            crv:
+              type: string
+              example: "P-256"
+            x:
+              type: string
+              description: Base64url-encoded x coordinate
+            y:
+              type: string
+              description: Base64url-encoded y coordinate
+            ext:
+              type: boolean
+        publicKeyECDHFingerprint:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+
+    EnrollInitResponse:
+      type: object
+      properties:
+        deviceId:
+          type: string
+        enrollCode:
+          type: string
+          description: 6-digit enrollment code
+          example: "482931"
+        expiresAt:
+          type: string
+          format: date-time
+        note:
+          type: string
+
+    EnrollLookupResponse:
+      type: object
+      properties:
+        deviceId:
+          type: string
+        deviceName:
+          type: string
+        publicKeyECDH:
+          type: object
+        publicKeyECDHFingerprint:
+          type: string
+        enrollCodeExpiresAt:
+          type: string
+          format: date-time
+
+    EnrollCompleteRequest:
+      type: object
+      required:
+        - enrollCode
+        - wrappedPrivateKeyForDevice
+        - wrappedPrivateKeyIv
+        - enrollerPublicKeyECDH
+      properties:
+        enrollCode:
+          type: string
+          pattern: "^\\d{6}$"
+        wrappedPrivateKeyForDevice:
+          type: string
+          description: "RSA private key wrapped for device B's ECDH key (base64)"
+        wrappedPrivateKeyIv:
+          type: string
+          description: "Base64 IV (12 bytes)"
+        enrollerPublicKeyECDH:
+          type: object
+          description: "ECDH public key of device A (so B can unwrap the private key)"
+          required:
+            - kty
+            - crv
+            - x
+            - y
+          properties:
+            kty:
+              type: string
+              enum:
+                - EC
+            crv:
+              type: string
+            x:
+              type: string
+            y:
+              type: string
+
+    EnrollCompleteResponse:
+      type: object
+      properties:
+        deviceId:
+          type: string
+        deviceName:
+          type: string
+        enrolled:
+          type: boolean
+          example: true
+        note:
+          type: string
+
+    EnrollPollRequest:
+      type: object
+      required:
+        - deviceId
+      properties:
+        deviceId:
+          type: string
+
+    EnrollPollResponse:
+      type: object
+      properties:
+        enrolled:
+          type: boolean
+          description: "False if enrollment not yet completed"
+        deviceId:
+          type: string
+        deviceName:
+          type: string
+        challenge:
+          type: string
+          description: "32-byte random nonce (base64) — present if enrolled=true"
+        challengeExpiresIn:
+          type: integer
+          description: "Challenge TTL in seconds (60s)"
+        publicKeyECDHFingerprint:
+          type: string
+        nextStep:
+          type: string
+        message:
+          type: string
+          description: "Present if enrolled=false"
+
+    EnrollVerifyRequest:
+      type: object
+      required:
+        - deviceId
+        - challenge
+        - signature
+      properties:
+        deviceId:
+          type: string
+        challenge:
+          type: string
+          description: "Challenge from poll endpoint"
+        signature:
+          type: string
+          description: "ECDSA P-256 signature over the challenge (base64, 64-72 bytes)"
+
+    EnrollVerifyResponse:
+      type: object
+      properties:
+        enrolled:
+          type: boolean
+          example: true
+        deviceId:
+          type: string
+        deviceName:
+          type: string
+        wrappedPrivateKeyForDevice:
+          type: string
+        wrappedPrivateKeyIv:
+          type: string
+        publicKeyECDH:
+          type: object
+        enrollerPublicKeyECDH:
+          type: object
+        note:
+          type: string
+
+    DeviceItem:
+      type: object
+      properties:
+        id:
+          type: string
+        deviceName:
+          type: string
+        publicKeyECDHFingerprint:
+          type: string
+        enrolledAt:
+          type: string
+          format: date-time
+        lastSeenAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    DeviceListResponse:
+      type: object
+      properties:
+        devices:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeviceItem"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+
+    RevokeDeviceResponse:
+      type: object
+      properties:
+        deviceId:
+          type: string
+        revoked:
+          type: boolean
+          example: true
+        note:
+          type: string
+
+    # -------------------------------------------------------------------------
+    # Users
+    # -------------------------------------------------------------------------
+    UserLookupResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+          nullable: true
+        publicKeyJwk:
+          type: object
+          description: RSA public key for wrapping symmetric keys
+        publicKeyFingerprint:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+
+    UserListItem:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+          nullable: true
+        publicKeyFingerprint:
+          type: string
+          nullable: true
+
+    UserListResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserListItem"
+
+    # -------------------------------------------------------------------------
+    # Audit Logs
+    # -------------------------------------------------------------------------
+    AuditLogCreateRequest:
+      type: object
+      required:
+        - encryptedEvent
+        - eventIv
+        - eventCategory
+      properties:
+        encryptedEvent:
+          type: string
+          description: AES-256-GCM encrypted event payload
+        eventIv:
+          type: string
+          description: Base64 IV (12 bytes)
+        eventCategory:
+          type: string
+          enum:
+            - auth
+            - secret
+            - share
+            - device
+            - recovery
+        eventSignature:
+          type: string
+          maxLength: 512
+          description: Optional signature for non-repudiation
+
+    AuditLogCreateResponse:
+      type: object
+      properties:
+        logId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        previousEventHash:
+          type: string
+          description: "SHA-256 hash of the previous log's ciphertext (empty string for first log)"
+          example: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        note:
+          type: string
+
+    AuditLogItem:
+      type: object
+      properties:
+        id:
+          type: string
+        encryptedEvent:
+          type: string
+        eventIv:
+          type: string
+        eventCategory:
+          type: string
+        previousEventHash:
+          type: string
+        eventSignature:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    AuditLogListResponse:
+      type: object
+      properties:
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLogItem"
+
+    # -------------------------------------------------------------------------
+    # Emergency Access
+    # -------------------------------------------------------------------------
+    EmergencyAccessCreateRequest:
+      type: object
+      required:
+        - beneficiaryEmail
+      properties:
+        beneficiaryEmail:
+          type: string
+          format: email
+          description: Email of the user who will receive emergency access
+        message:
+          type: string
+          maxLength: 500
+          description: Optional message for the beneficiary
+        delayHours:
+          type: integer
+          minimum: 1
+          maximum: 8760
+          default: 72
+          description: Time-lock delay in hours before recovery is possible
+
+    EmergencyAccessCreateResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        beneficiaryId:
+          type: string
+        beneficiaryEmail:
+          type: string
+        beneficiaryName:
+          type: string
+          nullable: true
+        status:
+          type: string
+          example: "pending"
+        delayHours:
+          type: integer
+        message:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    EmergencyAccessGrantItem:
+      type: object
+      properties:
+        id:
+          type: string
+        grantorId:
+          type: string
+        beneficiaryId:
+          type: string
+        status:
+          type: string
+          enum:
+            - pending
+            - active
+            - completed
+            - cancelled
+        delayHours:
+          type: integer
+        message:
+          type: string
+          nullable: true
+        claimedAt:
+          type: string
+          format: date-time
+          nullable: true
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        grantor:
+          type: object
+          properties:
+            id:
+              type: string
+            email:
+              type: string
+            name:
+              type: string
+              nullable: true
+        beneficiary:
+          type: object
+          properties:
+            id:
+              type: string
+            email:
+              type: string
+            name:
+              type: string
+              nullable: true
+
+    EmergencyAccessListResponse:
+      type: object
+      properties:
+        asGrantor:
+          type: array
+          items:
+            $ref: "#/components/schemas/EmergencyAccessGrantItem"
+        asBeneficiary:
+          type: array
+          items:
+            $ref: "#/components/schemas/EmergencyAccessGrantItem"
+
+    EmergencyAccessActionRequest:
+      type: object
+      required:
+        - action
+      properties:
+        action:
+          type: string
+          enum:
+            - claim
+            - cancel
+            - recover
+          description: |
+            - `claim`: Beneficiary starts the time-lock
+            - `cancel`: Grantor cancels a pending grant
+            - `recover`: Beneficiary recovers after time-lock expires
+
+    EmergencyAccessActionResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "active"
+        claimedAt:
+          type: string
+          format: date-time
+        releaseAt:
+          type: string
+          format: date-time
+        recoveryBlob:
+          type: string
+          description: "Encrypted recovery blob (present for recover action)"
+        recoveryIv:
+          type: string
+        recoverySalt:
+          type: string
+        recoveryIterations:
+          type: integer
+        grantorId:
+          type: string
+        remainingSeconds:
+          type: integer
+
+    # -------------------------------------------------------------------------
+    # Shared
+    # -------------------------------------------------------------------------
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+        retryAfter:
+          type: integer
+          description: "Seconds to wait before retrying (present on 429 responses)"
+
+    Pagination:
+      type: object
+      properties:
+        offset:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        hasMore:
+          type: boolean
+
+  responses:
+    BadRequest:
+      description: Invalid request body or parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "email: Email inválido"
+
+    Unauthorized:
+      description: Missing or invalid authentication token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "No autenticado. Proporciona un Authorization: Bearer <token> válido."
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "Usuario no encontrado"
+
+    TooManyRequests:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "Demasiados intentos. Intenta más tarde."
+            retryAfter: 900

@@ -1,35 +1,35 @@
 {
   "app": {
     "title": "Zero-Knowledge Vault",
-    "subtitle": "Team password manager · end-to-end encrypted in the browser"
+    "subtitle": "Gestionnaire de mots de passe d'équipe · chiffré de bout en bout dans le navigateur"
   },
   "nav": {
     "architecture": "Architecture",
-    "vault": "Demo Vault"
+    "vault": "Démo du coffre"
   },
   "auth": {
-    "login": "Log in",
-    "register": "Register",
-    "logout": "Log out",
-    "email": "Email",
-    "masterPassword": "Master password",
-    "loginTitle": "Access your encrypted vault"
+    "login": "Se connecter",
+    "register": "S'inscrire",
+    "logout": "Se déconnecter",
+    "email": "E-mail",
+    "masterPassword": "Mot de passe maître",
+    "loginTitle": "Accédez à votre coffre chiffré"
   },
   "vault": {
-    "title": "Vault",
-    "noSecrets": "No secrets",
-    "createSecret": "New secret",
-    "search": "Search secrets...",
-    "share": "Share",
-    "rotate": "Rotate password",
-    "delete": "Delete"
+    "title": "Coffre",
+    "noSecrets": "Aucun secret",
+    "createSecret": "Nouveau secret",
+    "search": "Rechercher des secrets...",
+    "share": "Partager",
+    "rotate": "Rotation du mot de passe",
+    "delete": "Supprimer"
   },
   "common": {
-    "loading": "Loading...",
-    "error": "Error",
-    "save": "Save",
-    "cancel": "Cancel",
-    "confirm": "Confirm",
-    "close": "Close"
+    "loading": "Chargement...",
+    "error": "Erreur",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "confirm": "Confirmer",
+    "close": "Fermer"
   }
 }
