@@ -1,49 +1,59 @@
 /**
- * logger.ts — Structured logging con niveles.
+ * logger.ts — Structured logging via pino.
  *
+ * Pino is the fastest Node.js logger and produces JSON output by default,
+ * which is consumed by most log aggregators (Loki, Datadog, CloudWatch,
+ * Elastic, etc.). In development, we use pino-pretty for human-readable
+ * output.
  */
-type LogLevel = "debug" | "info" | "warn" | "error";
+import pino from "pino";
 
-interface LogEntry {
-  level: LogLevel;
-  message: string;
-  timestamp: string;
-  [key: string]: unknown;
+const isDev = process.env.NODE_ENV !== "production";
+const level = process.env.LOG_LEVEL ?? (isDev ? "debug" : "info");
+
+export const logger = pino({
+  level,
+  base: {
+    service: "zk-vault",
+    version: process.env.npm_package_version ?? "1.0.0",
+  },
+  redact: {
+    paths: [
+      "masterPassword",
+      "masterKey",
+      "privateKey",
+      "privateKeyJwk",
+      "encryptedPrivateKeyJwk",
+      "sessionToken",
+      "token",
+      "password",
+      "secret",
+      "apiKey",
+      "authorization",
+      "req.headers.authorization",
+      "req.headers.cookie",
+    ],
+    censor: "[REDACTED]",
+  },
+  transport: isDev
+    ? {
+        target: "pino-pretty",
+        options: {
+          colorize: true,
+          translateTime: "SYS:standard",
+          ignore: "pid,hostname",
+        },
+      }
+    : undefined,
+});
+
+/**
+ * Helper to create a child logger with additional context (e.g. requestId,
+ * userId). Use this inside API routes:
+ *
+ *   const log = logger.child({ requestId, userId });
+ *   log.info({ secretId }, "secret created");
+ */
+export function createLogger(bindings: Record<string, unknown>) {
+  return logger.child(bindings);
 }
-
-const MIN_LEVEL: Record<LogLevel, number> = {
-  debug: 0,
-  info: 1,
-  warn: 2,
-  error: 3,
-};
-
-const currentLevel = (process.env.LOG_LEVEL ?? "info") as LogLevel;
-
-function log(level: LogLevel, message: string, meta?: Record<string, unknown>) {
-  if (MIN_LEVEL[level] < MIN_LEVEL[currentLevel]) return;
-
-  const entry: LogEntry = {
-    level,
-    message,
-    timestamp: new Date().toISOString(),
-    ...meta,
-  };
-
-  const output = JSON.stringify(entry);
-
-  if (level === "error") {
-    console.error(output);
-  } else if (level === "warn") {
-    console.warn(output);
-  } else {
-    console.log(output);
-  }
-}
-
-export const logger = {
-  debug: (msg: string, meta?: Record<string, unknown>) => log("debug", msg, meta),
-  info: (msg: string, meta?: Record<string, unknown>) => log("info", msg, meta),
-  warn: (msg: string, meta?: Record<string, unknown>) => log("warn", msg, meta),
-  error: (msg: string, meta?: Record<string, unknown>) => log("error", msg, meta),
-};

@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/lib/session-store";
-import { performRegistration, performLogin, importPublicKeyJwk } from "@/lib/crypto-client";
+import { performRegistration, performLogin, importPublicKeyJwk } from "@/lib/crypto";
 import { NewDeviceEnrollView } from "./NewDeviceEnrollView";
 import { PasswordStrengthMeter } from "./PasswordStrengthMeter";
 import { Loader2, ShieldCheck, KeyRound, LogIn, UserPlus, Eye, EyeOff, Smartphone } from "lucide-react";

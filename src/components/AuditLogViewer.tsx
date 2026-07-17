@@ -20,8 +20,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useApi } from "@/lib/api-client";
 import { useSession } from "@/lib/session-store";
-import { deriveAuditKey, decryptAuditEvent, type AuditCategory } from "@/lib/crypto-client";
-import { clearCryptoKeyRef } from "@/lib/memory-zero";
+import { deriveAuditKey, decryptAuditEvent, type AuditCategory } from "@/lib/crypto";
+import { clearCryptoKeyRef } from "@/lib/crypto/memory";
 import {
   Loader2,
   ScrollText,

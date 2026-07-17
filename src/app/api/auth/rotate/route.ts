@@ -31,7 +31,7 @@ import { db } from "@/lib/db";
 import {
   publicKeyFingerprint,
   verifyPopSignature,
-} from "@/lib/crypto-server";
+} from "@/lib/crypto/server";
 import { requireAuth } from "@/lib/auth-helper";
 import { rotateSchema, validatePayload } from "@/lib/validation-schemas";
 

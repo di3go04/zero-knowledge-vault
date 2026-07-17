@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/lib/session-store";
 import { useApi } from "@/lib/api-client";
-import { encryptNewSecret } from "@/lib/crypto-client";
+import { encryptNewSecret } from "@/lib/crypto";
 import { PasswordGenerator } from "./PasswordGenerator";
 import { Loader2, Lock, Plus } from "lucide-react";
 

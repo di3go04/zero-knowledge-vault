@@ -4,7 +4,7 @@
 "use client";
 
 import { useSession } from "./session-store";
-import { deriveAuditKey, encryptAuditEvent, type AuditCategory } from "./crypto-client";
+import { deriveAuditKey, encryptAuditEvent, type AuditCategory } from "./crypto";
 
 let auditKeyCache: CryptoKey | null = null;
 

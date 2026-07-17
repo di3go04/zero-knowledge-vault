@@ -1,0 +1,49 @@
+{
+  "name": "@zk-vault/crypto",
+  "version": "0.1.0",
+  "description": "Zero-Knowledge Vault crypto module — Web Crypto API primitives for end-to-end encrypted password management.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "files": [
+    "src/",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "keywords": [
+    "crypto",
+    "zero-knowledge",
+    "end-to-end-encryption",
+    "web-crypto",
+    "aes-gcm",
+    "rsa-oaep",
+    "ecdh",
+    "argon2",
+    "ml-kem",
+    "post-quantum"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@noble/curves": "^2.2.0",
+    "@noble/hashes": "^2.2.0",
+    "@noble/post-quantum": "^0.6.1",
+    "bip39": "^3.1.0",
+    "hash-wasm": "^4.12.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

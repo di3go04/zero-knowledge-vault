@@ -20,6 +20,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAuth } from "@/lib/auth-helper";
 import { createAuditLogSchema, validatePayload } from "@/lib/validation-schemas";
+import { checkRateLimit, rateLimitResponse, getClientIp } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 const VALID_CATEGORIES = ["auth", "secret", "share", "device", "recovery"];
 const MAX_LOGS_PER_REQUEST = 200;
@@ -37,25 +39,33 @@ export async function GET(req: NextRequest) {
     MAX_LOGS_PER_REQUEST,
   );
 
-  const where: any = { userId };
+  const where: { userId: string; eventCategory?: string } = { userId };
   if (category && VALID_CATEGORIES.includes(category)) {
     where.eventCategory = category;
   }
 
-  const logs = await db.auditLog.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-    take: limit,
-    select: {
-      id: true,
-      encryptedEvent: true,
-      eventIv: true,
-      eventCategory: true,
-      createdAt: true,
-    },
-  });
+  try {
+    const logs = await db.auditLog.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      select: {
+        id: true,
+        encryptedEvent: true,
+        eventIv: true,
+        eventCategory: true,
+        prevHash: true,
+        logHash: true,
+        createdAt: true,
+      },
+    });
 
-  return NextResponse.json({ logs });
+    logger.debug({ userId, count: logs.length, category }, "listed audit logs");
+    return NextResponse.json({ logs });
+  } catch (err) {
+    logger.error({ err, userId }, "failed to list audit logs");
+    return NextResponse.json({ error: "Error al listar logs" }, { status: 500 });
+  }
 }
 
 // ----------------------- POST (create) -----------------------
@@ -64,7 +74,15 @@ export async function POST(req: NextRequest) {
   if (!auth.ok) return auth.response;
   const userId = auth.userId;
 
-  let body: any;
+  // Rate limit: 100 audit logs per 5 min per IP+user
+  const ip = getClientIp(req);
+  const rl = await checkRateLimit(`audit:create:${ip}:${userId}`, 100, 5 * 60 * 1000);
+  if (!rl.allowed) {
+    logger.warn({ userId, ip }, "rate limited on audit log creation");
+    return rateLimitResponse(rl.retryAfterSeconds, rl.remaining);
+  }
+
+  let body: unknown;
   try {
     body = await req.json();
   } catch {
@@ -85,10 +103,15 @@ export async function POST(req: NextRequest) {
   });
   const prevHash = lastLog?.logHash ?? null;
 
-  // Calcular hash del log actual
-  const { computeLogHash } = await import("@/lib/hash-chain-logs");
+  // Calcular hash del log actual (hash chain — ver Fase 6)
+  const { computeLogHash } = await import("@/lib/crypto/hash-chain");
   const createdAt = new Date().toISOString();
-  const logHash = computeLogHash(prevHash, encryptedEvent, createdAt);
+  const logHash = await computeLogHash({
+    prevHash,
+    encryptedEvent,
+    eventIv,
+    createdAt,
+  });
 
   const log = await db.auditLog.create({
     data: {
@@ -101,6 +124,7 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  logger.info({ userId, logId: log.id, category: eventCategory }, "audit log created");
   return NextResponse.json({
     logId: log.id,
     createdAt: log.createdAt,

@@ -24,8 +24,8 @@ import {
   randomBytes,
   bufToBase64,
   RECOVERY_ITERATIONS,
-} from "@/lib/crypto-client";
-import { clearCryptoKeyRef, zeroBuffer } from "@/lib/memory-zero";
+} from "@/lib/crypto";
+import { clearCryptoKeyRef, zeroBuffer } from "@/lib/crypto/memory";
 import { useSession } from "@/lib/session-store";
 import {
   Loader2,

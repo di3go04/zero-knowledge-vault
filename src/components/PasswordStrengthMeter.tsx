@@ -1,48 +1,49 @@
 "use client";
 
-import { checkPasswordStrength, MIN_PASSWORD_SCORE } from "@/lib/password-strength";
+import { estimatePasswordStrength } from "@/lib/password-strength";
 import { useMemo } from "react";
 
-interface PasswordStrengthMeterProps {
+interface Props {
   password: string;
   email?: string;
 }
 
-/**
- * Medidor visual de fortaleza de contraseña con zxcvbn.
- *
- */
-export function PasswordStrengthMeter({ password, email }: PasswordStrengthMeterProps) {
-  const result = useMemo(
-    () => (password ? checkPasswordStrength(password, email) : null),
-    [password, email],
+const COLORS = [
+  "bg-red-500",
+  "bg-orange-500",
+  "bg-yellow-500",
+  "bg-lime-500",
+  "bg-green-500",
+];
+
+export function PasswordStrengthMeter({ password, email }: Props) {
+  const strength = useMemo(
+    () => (password ? estimatePasswordStrength(password, email ? [email] : []) : null),
+    [password, email]
   );
 
-  if (!result || !password) return null;
-
-  const bars = [1, 2, 3, 4];
-  const barColors = ["bg-destructive", "bg-destructive", "bg-amber-500", "bg-primary"];
+  if (!strength) {
+    return null;
+  }
 
   return (
     <div className="space-y-1">
-      <div className="flex items-center gap-1">
-        {bars.map((bar) => (
+      <div className="flex gap-1">
+        {[0, 1, 2, 3, 4].map((i) => (
           <div
-            key={bar}
-            className={`h-1 flex-1 rounded-full transition-colors ${
-              result.score >= bar ? barColors[result.score - 1] ?? "bg-primary" : "bg-muted"
+            key={i}
+            className={`h-1.5 flex-1 rounded-full ${
+              i <= strength.score ? COLORS[strength.score] : "bg-muted"
             }`}
           />
         ))}
-        <span className={`ml-2 text-[10px] font-medium ${result.color}`}>
-          {result.label}
-        </span>
       </div>
-      {result.score < MIN_PASSWORD_SCORE && result.suggestions.length > 0 ? (
-        <p className="text-[10px] text-muted-foreground">
-          {result.suggestions[0]}
-        </p>
-      ) : null}
+      <p className="text-xs text-muted-foreground">
+        {strength.label}
+        {strength.suggestions.length > 0 && (
+          <span className="block text-[10px]">{strength.suggestions[0]}</span>
+        )}
+      </p>
     </div>
   );
 }

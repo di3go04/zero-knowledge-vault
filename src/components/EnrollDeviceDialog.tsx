@@ -23,8 +23,8 @@ import {
   publicKeyFingerprint,
   exportPrivateKeyJwk,
   exportEcdhPublicKeyJwk,
-} from "@/lib/crypto-client";
-import { clearKeyPairRef, clearCryptoKeyRef, zeroBuffer } from "@/lib/memory-zero";
+} from "@/lib/crypto";
+import { clearKeyPairRef, clearCryptoKeyRef, zeroBuffer } from "@/lib/crypto/memory";
 import { Loader2, Smartphone, ShieldCheck, Fingerprint, Copy, Check, X } from "lucide-react";
 
 interface EnrollDeviceDialogProps {
@@ -160,7 +160,7 @@ export function EnrollDeviceDialog({ open, onOpenChange }: EnrollDeviceDialogPro
       //    (No usamos una privateKey ECDH persistente para no requerir
       //    migración de cuentas existentes. Cada enrollment usa un par
       //    efímero que se descarta tras el wrap.)
-      const { generateEcdhKeyPair } = await import("@/lib/crypto-client");
+      const { generateEcdhKeyPair } = await import("@/lib/crypto");
       const ephemeralPair = await generateEcdhKeyPair();
       ephemeralEcdhKeyRef.current = ephemeralPair;
 

@@ -25,7 +25,7 @@ import {
   importPublicKeyJwk,
   publicKeyFingerprint,
   shareSecretWithRecipient,
-} from "@/lib/crypto-client";
+} from "@/lib/crypto";
 import { Loader2, Share2, Users, Fingerprint, ShieldCheck } from "lucide-react";
 import type { SecretListItem } from "./ViewSecretDialog";
 

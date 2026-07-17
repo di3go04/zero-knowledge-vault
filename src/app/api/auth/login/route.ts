@@ -20,9 +20,10 @@ import { db } from "@/lib/db";
 import {
   generateDecoyLoginResponse,
   publicKeyFingerprint,
-} from "@/lib/crypto-server";
+} from "@/lib/crypto/server";
 import { issueSessionToken, SESSION_TTL } from "@/lib/session-token";
 import { loginSchema, validatePayload } from "@/lib/validation-schemas";
+import { logger } from "@/lib/logger";
 import { checkRateLimit, resetRateLimit, getClientIp, RATE_LIMIT_POLICIES } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
@@ -79,15 +80,16 @@ export async function POST(req: NextRequest) {
     const sessionToken = issueSessionToken(user.id);
     const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL;
 
+    logger.info({ userId: user.id, email: user.email }, "user logged in");
     return NextResponse.json({
       userId: user.id,
       email: user.email,
       name: user.name,
-      kdfAlgorithm: km.kdfAlgorithm, // "argon2id" | "pbkdf2"
+      kdfAlgorithm: km.kdfAlgorithm,
       kdfSalt: km.kdfSalt,
       kdfIterations: km.kdfIterations,
-      kdfMemoryKiB: km.kdfMemoryKiB, // null para PBKDF2
-      kdfParallelism: km.kdfParallelism, // null para PBKDF2
+      kdfMemoryKiB: km.kdfMemoryKiB,
+      kdfParallelism: km.kdfParallelism,
       encryptedPrivateKeyJwk: km.encryptedPrivateKeyJwk,
       privateKeyIv: km.privateKeyIv,
       encryptedMlKemPrivateKey: km.encryptedMlKemPrivateKey,

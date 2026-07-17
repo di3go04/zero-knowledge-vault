@@ -22,7 +22,7 @@ import { db } from "@/lib/db";
 import {
   publicKeyFingerprint,
   verifyChallenge,
-} from "@/lib/crypto-server";
+} from "@/lib/crypto/server";
 import { enrollVerifySchema, validatePayload } from "@/lib/validation-schemas";
 import { checkRateLimit, getClientIp, RATE_LIMIT_POLICIES } from "@/lib/rate-limit";
 import { getChallenge, deleteChallenge } from "@/lib/challenge-store";

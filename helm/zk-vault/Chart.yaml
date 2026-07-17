@@ -1,8 +1,0 @@
-apiVersion: v2
-name: zk-vault
-description: Zero-Knowledge Vault — End-to-end encrypted password manager
-type: application
-version: 1.0.0
-appVersion: "1.0.0"
-maintainers:
-  - name: ZK Vault Team

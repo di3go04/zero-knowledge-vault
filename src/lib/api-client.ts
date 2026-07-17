@@ -1,70 +1,70 @@
 /**
- * api-client.ts — Wrapper de fetch que inyecta automáticamente el
- * Authorization: Bearer header y maneja expiración de sesión.
+ * API client — thin wrapper around fetch that:
+ *  - Adds JSON Content-Type headers
+ *  - Throws on non-2xx responses
+ *  - Returns parsed JSON
  *
- * MEJORA Ciclo 2: centraliza la lógica de autenticación para que
- * ningún componente olvide el header.
- *
- * IMPORTANTE: leemos el token directamente del store en cada llamada
- * (no por closure) para evitar stale references cuando el token cambia.
+ * Also exports a `useApi` hook for React components that need a
+ * fetcher bound to the current session.
  */
-"use client";
+import { useCallback } from "react";
 
-import { useSession } from "./session-store";
+export async function api<T = unknown>(
+  path: string,
+  init?: RequestInit
+): Promise<T> {
+  const res = await fetch(path, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+    credentials: "same-origin",
+  });
 
+  if (!res.ok) {
+    let message = `Request failed: ${res.status}`;
+    try {
+      const body = (await res.json()) as { error?: string };
+      if (body?.error) message = body.error;
+    } catch {
+      // ignore JSON parse errors
+    }
+    throw new Error(message);
+  }
+
+  return res.json() as Promise<T>;
+}
+
+/**
+ * React hook that returns fetch helpers tied to the current session.
+ * `apiFetch` is a thin wrapper around fetch with credentials included.
+ * `serverLogout` calls /api/auth/logout and clears the local session.
+ */
 export function useApi() {
-  const logout = useSession((s) => s.logout);
+  const apiFetch = useCallback(
+    (path: string, init?: RequestInit) =>
+      fetch(path, {
+        ...init,
+        headers: {
+          "Content-Type": "application/json",
+          ...(init?.headers ?? {}),
+        },
+        credentials: "same-origin",
+      }),
+    []
+  );
 
-  async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
-    // Leer token FRESH del store en cada llamada (no por closure)
-    const state = useSession.getState();
-    const sessionToken = state.sessionToken;
-    const expiresAt = state.expiresAt;
-
-    // Verificar expiración antes de hacer la request
-    if (expiresAt !== null && expiresAt <= Math.floor(Date.now() / 1000)) {
-      logout();
-      throw new Error("Sesión expirada. Vuelve a iniciar sesión.");
+  const serverLogout = useCallback(async () => {
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+    } catch {
+      // ignore network errors on logout
     }
-
-    const headers = new Headers(init.headers);
-    if (sessionToken) {
-      headers.set("Authorization", `Bearer ${sessionToken}`);
-    }
-    if (init.body && !headers.has("Content-Type")) {
-      headers.set("Content-Type", "application/json");
-    }
-
-    const res = await fetch(path, { ...init, headers });
-
-    // Si el server responde 401, la sesión ya no es válida
-    if (res.status === 401) {
-      logout();
-      throw new Error("Sesión inválida. Vuelve a iniciar sesión.");
-    }
-
-    return res;
-  }
-
-  /**
-   * Logout server-side real: revoca el token en Redis blacklist.
-   * Luego limpia el estado local.
-   */
-  async function serverLogout(): Promise<void> {
-    const state = useSession.getState();
-    const sessionToken = state.sessionToken;
-    if (sessionToken) {
-      try {
-        await fetch("/api/auth/logout", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${sessionToken}` },
-        });
-      } catch {
-        // Si el server no responde, igualmente limpiamos local
-      }
-    }
-    logout();
-  }
+  }, []);
 
   return { apiFetch, serverLogout };
 }

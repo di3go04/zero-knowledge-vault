@@ -18,8 +18,8 @@ import {
   signChallenge,
   publicKeyFingerprint,
   importPublicKeyJwk,
-} from "@/lib/crypto-client";
-import { clearKeyPairRef, clearCryptoKeyRef } from "@/lib/memory-zero";
+} from "@/lib/crypto";
+import { clearKeyPairRef, clearCryptoKeyRef } from "@/lib/crypto/memory";
 import {
   Smartphone,
   Loader2,

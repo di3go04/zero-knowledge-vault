@@ -17,10 +17,11 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { logger } from "@/lib/logger";
 import {
   publicKeyFingerprint,
   verifyPopSignature,
-} from "@/lib/crypto-server";
+} from "@/lib/crypto/server";
 import { registerSchema, validatePayload } from "@/lib/validation-schemas";
 
 const NAME_MAX_LEN = 100;
@@ -114,6 +115,7 @@ export async function POST(req: NextRequest) {
     include: { keyMaterial: true },
   });
 
+  logger.info({ userId: user.id, email: user.email, kdfAlgorithm }, "user registered");
   return NextResponse.json({
     userId: user.id,
     email: user.email,

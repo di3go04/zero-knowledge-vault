@@ -1,60 +1,39 @@
-"use client";
-
-import { useEffect, useRef, useCallback } from "react";
-import { useSession } from "./session-store";
-import { useApi } from "./api-client";
-
-const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutos
-const CHECK_INTERVAL_MS = 30 * 1000; // verificar cada 30s
-const WARNING_BEFORE_MS = 60 * 1000; // avisar 1 min antes
-
 /**
- * Hook que detecta inactividad del usuario y fuerza logout automático
- * tras 15 minutos sin actividad (mouse, keyboard, scroll, touch).
- *
- *
- * Limpia las llaves de memoria y llama al logout server-side.
+ * useSessionTimeout — auto-locks the vault after N minutes of inactivity.
+ * Calls the provided callback (or clears the session by default) when
+ * the timer fires.
  */
-export function useSessionTimeout() {
-  const lastActivityRef = useRef<number>(Date.now());
-  const warnedRef = useRef<boolean>(false);
-  const { serverLogout } = useApi();
-  const sessionToken = useSession((s) => s.sessionToken);
+import { useEffect, useRef } from "react";
+import { useSession } from "./session-store";
 
-  const resetActivity = useCallback(() => {
-    lastActivityRef.current = Date.now();
-    warnedRef.current = false;
-  }, []);
+const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
+export function useSessionTimeout(timeoutMs: number = DEFAULT_TIMEOUT_MS): void {
+  const logout = useSession((s) => s.logout);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!sessionToken) return;
+    const reset = () => {
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => {
+        logout();
+      }, timeoutMs);
+    };
 
-    // Registrar eventos de actividad
-    const events = ["mousedown", "keydown", "scroll", "touchstart", "mousemove"];
+    const events: (keyof WindowEventMap)[] = [
+      "mousemove",
+      "keydown",
+      "click",
+      "scroll",
+      "touchstart",
+    ];
 
-    const onActivity = () => resetActivity();
-    events.forEach((e) => window.addEventListener(e, onActivity, { passive: true }));
-
-    // Verificar inactividad cada 30s
-    const interval = setInterval(async () => {
-      const elapsed = Date.now() - lastActivityRef.current;
-      
-      if (elapsed >= INACTIVITY_TIMEOUT_MS) {
-        // Timeout — forzar logout
-        console.warn("[session] Timeout por inactividad — cerrando sesión");
-        await serverLogout();
-      } else if (elapsed >= INACTIVITY_TIMEOUT_MS - WARNING_BEFORE_MS && !warnedRef.current) {
-        // Advertir 1 min antes
-        warnedRef.current = true;
-        console.info("[session] Sesión expirará en 1 minuto por inactividad");
-      }
-    }, CHECK_INTERVAL_MS);
+    events.forEach((e) => window.addEventListener(e, reset));
+    reset();
 
     return () => {
-      events.forEach((e) => window.removeEventListener(e, onActivity));
-      clearInterval(interval);
+      events.forEach((e) => window.removeEventListener(e, reset));
+      if (timer.current) clearTimeout(timer.current);
     };
-  }, [sessionToken, resetActivity, serverLogout]);
-
-  return { resetActivity };
+  }, [logout, timeoutMs]);
 }

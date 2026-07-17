@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/lib/session-store";
 import { useApi } from "@/lib/api-client";
-import { performPasswordRotation } from "@/lib/crypto-client";
+import { performPasswordRotation } from "@/lib/crypto";
 import { Loader2, KeyRound, ShieldCheck, AlertTriangle } from "lucide-react";
 
 interface RotatePasswordDialogProps {

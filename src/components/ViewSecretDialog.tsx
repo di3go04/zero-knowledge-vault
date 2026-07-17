@@ -14,8 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/lib/session-store";
-import { decryptSecret } from "@/lib/crypto-client";
-import { zeroBuffer, clearCryptoKeyRef } from "@/lib/memory-zero";
+import { decryptSecret } from "@/lib/crypto";
+import { zeroBuffer, clearCryptoKeyRef } from "@/lib/crypto/memory";
 import { Loader2, Lock, Eye, EyeOff, Copy, Check } from "lucide-react";
 
 interface ViewSecretDialogProps {
