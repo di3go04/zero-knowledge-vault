@@ -1,0 +1,34 @@
+// Zero-Knowledge Vault — Content Script
+//
+// Injected into every page. Listens for autofill messages from the service worker
+// and fills password fields when the user triggers autofill from the popup.
+
+(function () {
+  let active = false;
+
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message.type === "FILL_CREDENTIALS") {
+      fillCredentials(message.username, message.password);
+    }
+  });
+
+  function fillCredentials(username, password) {
+    const usernameField =
+      document.querySelector('input[type="email"]') ??
+      document.querySelector('input[name="username"]') ??
+      document.querySelector('input[autocomplete="username"]');
+
+    const passwordField =
+      document.querySelector('input[type="password"]') ??
+      document.querySelector('input[autocomplete="current-password"]');
+
+    if (usernameField) {
+      usernameField.value = username;
+      usernameField.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    if (passwordField) {
+      passwordField.value = password;
+      passwordField.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  }
+})();

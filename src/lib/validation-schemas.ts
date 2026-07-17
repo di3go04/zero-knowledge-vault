@@ -667,3 +667,145 @@ export const userActionTokenSchema = z.object({
 export const verifyActionTokenSchema = z.object({
   token: z.string().min(1).max(500),
 });
+
+// ---------------------------------------------------------------------------
+// Collaboration Feature Schemas (#41–#52)
+// ---------------------------------------------------------------------------
+
+// #41 — One-Time Share
+export const oneTimeShareSchema = z.object({
+  secretId: z.string().min(1).max(100),
+  wrappedSymmetricKey: rsaWrappedKey,
+  maxViews: z.number().int().min(1).max(100).default(1),
+  expiresInHours: z.number().int().min(1).max(720).default(24),
+});
+
+// #42 — Temporary Vault
+export const createTempVaultSchema = z.object({
+  name: z.string().max(200).optional(),
+  encryptedData: z.string().max(500_000).optional(),
+  dataIv: z.string().max(1000).optional(),
+  expiresInHours: z.number().int().min(1).max(8760).default(24),
+});
+
+export const updateTempVaultSchema = z.object({
+  name: z.string().max(200).optional(),
+  encryptedData: z.string().max(500_000).optional(),
+  dataIv: z.string().max(1000).optional(),
+  expiresInHours: z.number().int().min(1).max(8760).optional(),
+});
+
+// #43 — Version History
+export const createVersionSchema = z.object({
+  encryptedData: z.string().min(1),
+  dataIv: z.string().min(1),
+  encryptedTitle: z.string().optional(),
+  titleIv: z.string().optional(),
+  encryptedDiff: z.string().optional(),
+  diffIv: z.string().optional(),
+  changelog: z.string().max(500).optional(),
+});
+
+// #44 — Comments
+export const createCommentSchema = z.object({
+  content: z.string().min(1).max(100_000),
+  contentIv: z.string().max(1000).optional(),
+  mentions: z.array(z.string()).max(50).optional(),
+  parentId: z.string().max(100).optional(),
+});
+
+export const updateCommentSchema = z.object({
+  content: z.string().min(1).max(100_000).optional(),
+  contentIv: z.string().max(1000).optional(),
+  mentions: z.array(z.string()).max(50).optional(),
+});
+
+// #45 — Notifications
+export const notificationUpdateSchema = z.object({
+  read: z.boolean(),
+});
+
+export const notificationQuerySchema = z.object({
+  read: z.string().optional(),
+  limit: z.string().optional(),
+});
+
+// #46 — Activity Feed
+export const activityQuerySchema = z.object({
+  action: z.string().optional(),
+  resourceType: z.string().optional(),
+  limit: z.string().optional(),
+  offset: z.string().optional(),
+});
+
+// #47 — Pre-Approval Sharing
+export const shareApprovalRequestSchema = z.object({
+  secretId: z.string().min(1).max(100),
+  approverId: z.string().min(1).max(100),
+  recipientId: z.string().min(1).max(100).optional(),
+  reason: z.string().max(2000).optional(),
+});
+
+export const shareApprovalDecisionSchema = z.object({
+  decision: z.enum(["approved", "rejected"]),
+  wrappedSymmetricKey: rsaWrappedKey.optional(),
+  comment: z.string().max(2000).optional(),
+});
+
+// #48 — Tags
+export const tagSchema = z.object({
+  name: z.string().min(1).max(50),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "must be hex color").optional(),
+  favorite: z.boolean().optional(),
+});
+
+export const secretTagSchema = z.object({
+  tagId: z.string().min(1).max(100),
+});
+
+export const tagSearchSchema = z.object({
+  q: z.string().optional(),
+  limit: z.string().optional(),
+});
+
+// #49 — Import/Export
+export const importPasswordsSchema = z.object({
+  source: z.enum(["bitwarden", "1password", "dashlane", "lastpass", "manual", "proton-pass", "keeper"]),
+  items: z.array(z.object({
+    encryptedTitle: z.string().min(1),
+    titleIv: z.string().min(1),
+    encryptedData: z.string().min(1),
+    dataIv: z.string().min(1),
+    secretType: z.enum(SECRET_TYPES).default("password"),
+    encryptedMetadata: z.string().optional(),
+    metadataIv: z.string().optional(),
+  })).min(1).max(1000),
+});
+
+// #50 — Email Share
+export const emailShareSchema = z.object({
+  secretId: z.string().min(1).max(100),
+  recipientEmail: email,
+  message: z.string().max(2000).optional(),
+  expiresInHours: z.number().int().min(1).max(720).default(48),
+});
+
+// #51 — Access Request
+export const accessRequestSchema = z.object({
+  secretId: z.string().min(1).max(100),
+  reason: z.string().max(2000).optional(),
+});
+
+export const accessRequestDecisionSchema = z.object({
+  decision: z.enum(["approved", "denied"]),
+  wrappedSymmetricKey: rsaWrappedKey.optional(),
+  comment: z.string().max(2000).optional(),
+});
+
+// #52 — Share Audit
+export const shareAuditEventSchema = z.object({
+  secretId: z.string().min(1).max(100),
+  action: z.enum(["share", "revoke", "view", "claim", "approve", "deny", "request", "email-share"]),
+  targetId: z.string().max(200).optional(),
+  metadata: z.string().max(5000).optional(),
+});

@@ -1,0 +1,11 @@
+# Firefox Extension — Popup
+
+The popup directory is intentionally omitted: Firefox uses the same popup HTML/CSS/JS
+as the Chrome extension (platform/chrome-extension/popup/). The only difference is the
+background script API (browser.* vs chrome.*).
+
+During build, copy:
+  platform/chrome-extension/popup/  →  platform/firefox-extension/popup/
+
+Or symlink:
+  mklink /J platform\firefox-extension\popup platform\chrome-extension\popup

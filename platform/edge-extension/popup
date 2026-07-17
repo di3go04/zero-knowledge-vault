@@ -1,0 +1,7 @@
+# Edge Extension — Popup
+
+Edge shares the same Manifest V3 API surface as Chrome. Copy popup files from:
+  platform/chrome-extension/popup/
+
+During build:
+  copy /Y platform\chrome-extension\popup\* platform\edge-extension\popup\

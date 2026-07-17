@@ -1,0 +1,22 @@
+{
+  "name": "zk-vault-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "preview": "tauri dev --no-server"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.5.0",
+    "@tauri-apps/plugin-clipboard-manager": "^2.3.0",
+    "@tauri-apps/plugin-store": "^2.3.0",
+    "next": "^16.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.5.0",
+    "typescript": "^5.7.0"
+  }
+}

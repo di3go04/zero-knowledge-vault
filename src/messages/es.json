@@ -1,0 +1,35 @@
+{
+  "app": {
+    "title": "Zero-Knowledge Vault",
+    "subtitle": "Gestor de contraseñas para equipos · cifrado end-to-end en el navegador"
+  },
+  "nav": {
+    "architecture": "Arquitectura",
+    "vault": "Demo Vault"
+  },
+  "auth": {
+    "login": "Iniciar sesión",
+    "register": "Registrarse",
+    "logout": "Cerrar sesión",
+    "email": "Email",
+    "masterPassword": "Contraseña maestra",
+    "loginTitle": "Accede a tu bóveda cifrada"
+  },
+  "vault": {
+    "title": "Bóveda",
+    "noSecrets": "No hay secretos",
+    "createSecret": "Nuevo secreto",
+    "search": "Buscar secretos...",
+    "share": "Compartir",
+    "rotate": "Rotar contraseña",
+    "delete": "Eliminar"
+  },
+  "common": {
+    "loading": "Cargando...",
+    "error": "Error",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "close": "Cerrar"
+  }
+}

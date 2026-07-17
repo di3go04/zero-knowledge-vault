@@ -43,6 +43,7 @@ model User {
   complianceReports      ComplianceReport[]
   eDiscoveryExports      EDiscoveryExport[]
   actionTokens           UserActionToken[]
+  accessRequests         AccessRequest[]
 }
 
 // ---------------------------------------------------------------------
@@ -734,4 +735,244 @@ model UserActionToken {
   @@index([userId, action])
   @@index([token])
   @@index([status, expiresAt])
+}
+
+// =====================================================================
+// Collaboration Feature Models (#41–#52)
+// =====================================================================
+
+// #41 — One-Time Share
+// Crea un link de un solo uso (o N usos máx) para compartir un secreto.
+// El token es un identificador opaco; al canjearlo, el servidor entrega
+// la wrappedSymmetricKey y marca el uso. Una vez alcanzado maxViews, se
+// invalida.
+model OneTimeShare {
+  id                  String    @id @default(cuid())
+  secretId            String
+  ownerId             String
+  token               String    @unique
+  wrappedSymmetricKey String
+  maxViews            Int       @default(1)
+  currentViews        Int       @default(0)
+  expiresAt           DateTime
+  status              String    @default("active") // active | claimed | expired
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([token])
+  @@index([ownerId])
+  @@index([status, expiresAt])
+}
+
+// #42 — Temporary Vault
+// Vault efímero que expira automáticamente. Pensado para integraciones
+// temporales o equipos externos con acceso limitado en el tiempo.
+model TempVault {
+  id            String    @id @default(cuid())
+  ownerId       String
+  name          String?
+  encryptedData String? // base64 — el contenido cifrado del vault temporal
+  dataIv        String?
+  expiresAt     DateTime
+  status        String    @default("active") // active | expired
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([ownerId])
+  @@index([status, expiresAt])
+}
+
+// #43 — Secret Version History
+// Cada versión almacena una foto completa del secreto (cifrado) en ese
+// momento. encryptedDiff (opcional) es un diff cifrado que el cliente
+// puede calcular para mostrar cambios. El servidor nunca ve el contenido.
+model SecretVersion {
+  id              String   @id @default(cuid())
+  secretId        String
+  versionNumber   Int
+  encryptedData   String // base64 — AES-256-GCM
+  dataIv          String // base64
+  encryptedTitle  String? // base64 — puede cambiar entre versiones
+  titleIv         String?
+  encryptedDiff   String? // base64 — diff cifrado opcional
+  diffIv          String?
+  createdBy       String   // userId
+  changelog       String? // metadata: "Rotación de contraseña", "Actualización de URL", etc.
+  createdAt       DateTime @default(now())
+
+  @@unique([secretId, versionNumber])
+  @@index([secretId, createdAt])
+}
+
+// #44 — Comment / Annotation
+// Comentarios sobre un secreto. El contenido puede ir cifrado o en
+// claro (depende del policy). mentions (JSON array) almacena los
+// userIds mencionados con @ para notificaciones.
+model Comment {
+  id        String   @id @default(cuid())
+  secretId  String
+  authorId  String
+  content   String // puede ir cifrado (base64 AES-GCM) si el policy lo exige
+  contentIv String? // IV si content está cifrado
+  mentions  String? // JSON array: ["userId1", "userId2"]
+  parentId  String? // ID del comentario padre (para replies en hilo)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([secretId, createdAt])
+  @@index([authorId])
+}
+
+// #45 — Notification
+// Notificaciones push/SSE para eventos en tiempo real.
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String // "share" | "comment" | "access-request" | "approval" | "system"
+  title     String
+  body      String?
+  data      String? // JSON payload
+  read      Boolean   @default(false)
+  createdAt DateTime  @default(now())
+
+  @@index([userId, read, createdAt])
+  @@index([userId, createdAt])
+}
+
+// #46 — Activity Event
+// Feed de actividad del usuario: acciones realizadas sobre recursos.
+model ActivityEvent {
+  id           String   @id @default(cuid())
+  userId       String
+  action       String // "create" | "share" | "view" | "edit" | "delete" | "comment" | "import" | "export"
+  resourceType String // "secret" | "vault" | "share" | "comment"
+  resourceId   String?
+  metadata     String? // JSON — detalles adicionales
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([resourceType, resourceId])
+}
+
+// #47 — Pre-Approval Sharing
+// Flujo: Alice solicita aprobación para compartir con Bob, un approver
+// (ej. manager) aprueba o rechaza. Si aprueba, la wrappedSymmetricKey
+// se entrega al destinatario.
+model ShareApproval {
+  id                  String    @id @default(cuid())
+  secretId            String
+  requesterId         String
+  approverId          String
+  recipientId         String?
+  reason              String?
+  status              String    @default("pending") // pending | approved | rejected | cancelled
+  wrappedSymmetricKey String? // se asigna al aprobar
+  approverComment     String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([secretId])
+  @@index([approverId, status])
+  @@index([requesterId])
+}
+
+// #48 — Tags & Favorites
+// Tags para organizar y buscar secretos. Relación N:M entre Secret y Tag.
+model Tag {
+  id           String      @id @default(cuid())
+  name         String      @unique
+  color        String?     @default("#6366f1")
+  favorite     Boolean     @default(false) // si es un tag de favoritos o tag normal
+  createdBy    String?
+  createdAt    DateTime    @default(now())
+
+  secretTags   SecretTag[]
+}
+
+model SecretTag {
+  id        String   @id @default(cuid())
+  secretId  String
+  tagId     String
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([secretId, tagId])
+  @@index([secretId])
+  @@index([tagId])
+}
+
+// #49 — Import/Export Log
+// Registro de operaciones de importación/exportación de contraseñas.
+model ImportExportLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String // "import" | "export"
+  source    String? // "bitwarden" | "1password" | "dashlane" | "lastpass" | "manual"
+  format    String   @default("csv")
+  itemCount Int      @default(0)
+  status    String   @default("completed") // completed | failed
+  errorMsg  String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// #50 — Email Share (Magic Link)
+// Compartir un secreto vía email. El destinatario recibe un magic link
+// con un token. Al abrirlo, si el destinatario tiene cuenta, puede
+// reclamar el share. Si no, se le invita a registrarse.
+model EmailShare {
+  id                  String    @id @default(cuid())
+  secretId            String
+  senderId            String
+  recipientEmail      String
+  token               String    @unique
+  wrappedSymmetricKey String? // se asigna cuando el destinatario reclama
+  message             String? // mensaje opcional del remitente
+  status              String    @default("pending") // pending | sent | claimed | expired
+  expiresAt           DateTime
+  claimedAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([token])
+  @@index([recipientEmail])
+  @@index([senderId])
+}
+
+// #51 — Access Request
+// Un usuario solicita acceso a un secreto que no le pertenece.
+// El owner del secreto puede aprobar o denegar.
+model AccessRequest {
+  id              String    @id @default(cuid())
+  secretId        String
+  requesterId     String
+  requester       User      @relation(fields: [requesterId], references: [id], onDelete: Cascade)
+  reason          String?
+  status          String    @default("pending") // pending | approved | denied
+  approverId      String?
+  approverComment String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([secretId, status])
+  @@index([requesterId, status])
+}
+
+// #52 — Share Audit Event
+// Registro detallado de cada acción sobre shares: quién, qué, cuándo.
+model ShareAuditEvent {
+  id        String   @id @default(cuid())
+  secretId  String
+  actorId   String
+  action    String // "share" | "revoke" | "view" | "claim" | "approve" | "deny" | "request" | "email-share"
+  targetId  String? // userId del destinatario o email
+  metadata  String? // JSON — detalles adicionales
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([secretId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
 }
