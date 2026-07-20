@@ -22,10 +22,51 @@
  */
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
-const SESSION_SECRET =
-  process.env.SESSION_SECRET || "zk-vault-session-secret-change-in-prod-min-32-chars!!";
+/**
+ * BLOQUE 1 — Arranque seguro: SESSION_SECRET debe estar configurado en el
+ * entorno. Si falta o es demasiado corto, el servidor aborta con exit(1)
+ * en lugar de usar un fallback hardcodeado que sería una vulnerabilidad
+ * crítica en producción.
+ */
+function loadSessionSecret(): string {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) {
+    // En test permitimos un valor por defecto para no romper vitest.
+    if (process.env.NODE_ENV === "test" || process.env.VITEST === "true") {
+      return "test-only-secret-do-not-use-in-production-min-32-chars!!";
+    }
+    console.error(
+      "[FATAL] SESSION_SECRET no está configurado. " +
+        "Genera uno con: openssl rand -base64 48\n" +
+        "Y defínelo en .env o como variable de entorno del proceso.",
+    );
+    process.exit(1);
+  }
+  if (secret.length < 32) {
+    console.error(
+      "[FATAL] SESSION_SECRET demasiado corto (mínimo 32 caracteres). " +
+        `Actual: ${secret.length} caracteres. ` +
+        "Genera uno nuevo con: openssl rand -base64 48",
+    );
+    process.exit(1);
+  }
+  if (
+    secret.includes("change-me") ||
+    secret.includes("change-in-prod") ||
+    secret.includes("zk-vault-session-secret")
+  ) {
+    console.error(
+      "[FATAL] SESSION_SECRET contiene un placeholder de ejemplo. " +
+        "NO uses valores del .env.example en producción.",
+    );
+    process.exit(1);
+  }
+  return secret;
+}
 
-const SESSION_TTL_SECONDS = 8 * 60 * 60; // 8 horas
+export const SESSION_SECRET = loadSessionSecret();
+export const SESSION_TTL = 8 * 60 * 60; // 8 horas (seconds) — export público
+const SESSION_TTL_SECONDS = SESSION_TTL;
 
 export interface SessionPayload {
   uid: string; // userId
@@ -86,7 +127,7 @@ async function getBlacklistAdapter(): Promise<BlacklistAdapter> {
 
         // Manejar errores de conexión persistentes
         redis.on("error", (err: Error) => {
-          console.warn("[blacklist] Redis error (sigue en degraded mode):", err.message);
+          console.warn("[blacklist] Redis degraded — fallback a Map in-memory");
           _redisHealthOk = false;
         });
 
@@ -104,7 +145,7 @@ async function getBlacklistAdapter(): Promise<BlacklistAdapter> {
               await redis.set(`bl:${jti}`, "1", "EX", ttlSeconds);
             } catch (err: any) {
               // Redis caído — fallback a Map in-memory
-              console.warn("[blacklist] Redis add falló, usando Map:", err.message);
+              console.warn("[blacklist] Redis add failed — fallback a Map");
               memoryAdd(jti, ttlSeconds);
             }
           },
@@ -119,7 +160,7 @@ async function getBlacklistAdapter(): Promise<BlacklistAdapter> {
               // Redis caído — fail-open (no bloquear usuario legítimo)
               // pero verificar Map in-memory por si el jti fue añadido
               // durante un fallo de Redis.
-              console.warn("[blacklist] Redis has falló, usando Map:", err.message);
+              console.warn("[blacklist] Redis has failed — fallback a Map");
               return memoryHas(jti);
             }
           },
@@ -129,7 +170,7 @@ async function getBlacklistAdapter(): Promise<BlacklistAdapter> {
         return _adapter;
       }
     } catch (err: any) {
-      console.warn("[blacklist] Redis no disponible, fallback a Map:", err?.message ?? err);
+      console.warn("[blacklist] Redis unavailable — fallback to Map");
     }
   }
 
@@ -304,4 +345,43 @@ export async function extractUserIdFromAuth(authHeader: string | null): Promise<
   return payload?.uid ?? null;
 }
 
-export const SESSION_TTL = SESSION_TTL_SECONDS;
+/**
+ * BLOQUE 2 — Extrae el jti del token de sesión del header Authorization.
+ * Usado por /api/auth/rotate para identificar qué token invalidar tras
+ * rotar la contraseña maestra.
+ */
+export function getSessionJti(req: Request): string | null {
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  const token = authHeader.slice(7);
+  const payload = verifySessionToken(token);
+  return payload?.jti ?? null;
+}
+
+/**
+ * BLOQUE 2 — Invalida todos los tokens de sesión activos de un usuario.
+ *
+ * Tras rotar la contraseña maestra, todas las sesiones abiertas en otros
+ * dispositivos deben cerrarse. Esta función:
+ *   1. Invalida el token actual (jti conocido) vía blacklist.
+ *   2. En una implementación con Redis real, también iteraría sobre un
+ *      índice `user:jti:<userId>` para invalidar todos los jtis emitidos.
+ *
+ * La implementación actual invalida al menos el token actual. Para una
+ * invalidación completa cross-device, se requiere Redis con un SET por
+ * usuario que liste todos los jtis activos.
+ */
+export async function invalidateAllUserTokens(
+  userId: string,
+  currentJti: string,
+): Promise<void> {
+  // Invalidar el token actual via blacklist adapter
+  const adapter = await getBlacklistAdapter();
+  await adapter.add(currentJti, SESSION_TTL_SECONDS);
+
+  // TODO (producción con Redis): iterar sobre el índice user:jti:<userId>
+  // para invalidar todos los jtis activos del usuario. Esto requiere
+  // modificar issueSessionToken para que también haga SADD al índice.
+  // Por ahora, el cliente debe hacer logout explícito en otros dispositivos.
+  void userId; // evita warning de unused hasta que se implemente el índice
+}

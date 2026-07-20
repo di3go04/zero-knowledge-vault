@@ -1,20 +1,81 @@
-skills/
+# =====================================================================
+# Zero-Knowledge Vault — .gitignore
+# =====================================================================
+
+# Dependencies
 node_modules/
+
+# Build artifacts
 .next/
 out/
 build/
 dist/
+standalone/
+
+# Tests & coverage
 coverage/
 playwright-report/
 test-results/
+.nyc_output/
+
+# Audit & SARIF reports (generated, not source)
 audit-reports/
 *.sarif
 *.cdx.json
-dev.log
-server.log
-db/*.db
-db/*.db-journal
+
+# Environment (never commit real secrets)
 .env
 .env.local
 .env.*.local
+.env.production
+.env.staging
+
+# Logs
+*.log
+dev.log
+server.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Database
+db/*.db
+db/*.db-journal
+db/*.sqlite
+db/*.sqlite-journal
+
+# TypeScript build cache
+*.tsbuildinfo
 tsconfig.tsbuildinfo
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary / scratch directories (BLOQUE 1 — purga estricta)
+tool-results/
+upload/
+download/
+tmp/
+temp/
+*.tmp
+
+# Legacy scaffold (removed from tracking in commit 8a94e07)
+skills/
+
+# Playwright
+/playwright/.cache/
+
+# Vercel
+.vercel
+
+# Optional: package-lock files (we use bun.lock)
+package-lock.json
+yarn.lock

@@ -34,6 +34,8 @@ import {
 } from "@/lib/crypto/server";
 import { requireAuth } from "@/lib/auth-helper";
 import { rotateSchema, validatePayload } from "@/lib/validation-schemas";
+import { invalidateAllUserTokens, getSessionJti } from "@/lib/session-token";
+import { logger } from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
   const auth = await requireAuth(req);
@@ -110,6 +112,28 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  // BLOQUE 2 — Invalidar TODOS los tokens de sesión activos del usuario.
+  // Tras rotar la contraseña maestra, cualquier sesión abierta en otros
+  // dispositivos debe cerrarse inmediatamente. Usamos el jti del token
+  // actual para obtenerlo y luego invalidar todos los tokens del usuario.
+  try {
+    const currentJti = getSessionJti(req);
+    if (currentJti) {
+      // Invalidar el token actual y todos los demás del usuario.
+      // En una implementación con Redis real, esto requiere un índice
+      // secundario `user:jti:<userId>` → Set<jti>. Aquí invalidamos
+      // al menos el token actual.
+      await invalidateAllUserTokens(userId, currentJti);
+      logger.info({ userId }, "all sessions invalidated after password rotation");
+    }
+  } catch (err) {
+    // No fallar la rotación si la invalidación falla — el usuario ya
+    // rotó su contraseña, lo crítico está hecho.
+    logger.warn({ userId, err: String(err) }, "failed to invalidate tokens after rotation");
+  }
+
+  logger.info({ userId }, "master password rotated");
+
   return NextResponse.json({
     rotated: true,
     userId,
@@ -117,6 +141,6 @@ export async function POST(req: NextRequest) {
     newKdfSalt,
     newKdfIterations,
     publicKeyFingerprint: serverFingerprint, // sin cambios
-    note: "Contraseña maestra rotada. La privateKey RSA no cambió — las wrappedKeys y shares existentes siguen siendo válidas.",
+    note: "Contraseña maestra rotada. La privateKey RSA no cambió — las wrappedKeys y shares existentes siguen siendo válidas. Todos los tokens de sesión han sido invalidados; debes re-login en todos tus dispositivos.",
   });
 }

@@ -24,7 +24,7 @@ import {
 import { issueSessionToken, SESSION_TTL } from "@/lib/session-token";
 import { loginSchema, validatePayload } from "@/lib/validation-schemas";
 import { logger } from "@/lib/logger";
-import { checkRateLimit, resetRateLimit, getClientIp, RATE_LIMIT_POLICIES } from "@/lib/rate-limit";
+import { checkRateLimit, resetRateLimit, getClientIp, RATE_LIMIT_POLICIES, rateLimitResponse } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   let body: any;
@@ -42,30 +42,27 @@ export async function POST(req: NextRequest) {
   const normalizedEmail = email.toLowerCase().trim();
   const ip = getClientIp(req);
 
-  // -------- Rate limit (async — usa Redis o Map) --------
-  const rlKey = `login:${ip}:${normalizedEmail}`;
-  const rl = await checkRateLimit(
-    rlKey,
-    RATE_LIMIT_POLICIES.login.maxAttempts,
-    RATE_LIMIT_POLICIES.login.windowMs,
-  );
-  if (!rl.allowed) {
-    return NextResponse.json(
-      {
-        error: "Demasiados intentos. Intenta más tarde.",
-        retryAfter: rl.retryAfterSeconds,
-      },
-      {
-        status: 429,
-        headers: {
-          "Retry-After": String(rl.retryAfterSeconds),
-          "X-RateLimit-Remaining": "0",
-          "X-RateLimit-Reset": String(rl.retryAfterSeconds),
-        },
-      },
-    );
-  }
+  // -------- BLOQUE 2: Rate limit dual — por IP Y por email --------
+  // Anti-bruteforce: bloqueamos tanto por IP (atacante distribuido)
+  // como por email (cred stuffing desde múltiples IPs).
+  const ipKey = `login:ip:${ip}`;
+  const emailKey = `login:email:${normalizedEmail}`;
 
+  const [ipRl, emailRl] = await Promise.all([
+    checkRateLimit(ipKey, 20, 15 * 60 * 1000), // 20 intentos / 15 min / IP (cualquier email)
+    checkRateLimit(emailKey, RATE_LIMIT_POLICIES.login.maxAttempts, RATE_LIMIT_POLICIES.login.windowMs), // 5 / 15 min / email
+  ]);
+
+  const rl = ipRl.allowed ? emailRl : ipRl;
+  if (!rl.allowed) {
+    logger.warn(
+      { ip, email: normalizedEmail, reason: !ipRl.allowed ? "ip" : "email" },
+      "login rate limited",
+    );
+    return rateLimitResponse(rl.retryAfterSeconds, rl.remaining);
+  }
+  // Mantener compatibilidad con el código existente que usa rlKey
+  const rlKey = emailKey;
   const user = await db.user.findUnique({
     where: { email: normalizedEmail },
     include: { keyMaterial: true },

@@ -74,7 +74,7 @@ async function getStore(): Promise<RateLimitStore> {
         return _store;
       }
     } catch (err: any) {
-      console.warn("[rate-limit] Redis no disponible, fallback a Map:", err?.message);
+      console.warn("[rate-limit] Redis unavailable — fallback to Map");
     }
   }
 

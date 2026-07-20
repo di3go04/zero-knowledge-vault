@@ -2,6 +2,9 @@
   "name": "zk-vault",
   "version": "1.0.0",
   "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build --webpack",
@@ -14,7 +17,10 @@
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:reset": "prisma migrate reset"
+    "db:reset": "prisma migrate reset",
+    "db:seed": "bun prisma/seed.ts",
+    "audit:ci": "bun audit --production --severity moderate",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@noble/curves": "^2.2.0",
@@ -52,6 +58,7 @@
     "zxcvbn": "^4.4.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^22.10.0",
     "@types/react": "^19",
