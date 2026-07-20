@@ -281,6 +281,10 @@ export function AuthView() {
                     id="logEmail"
                     type="email"
                     autoComplete="email"
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    translate="no"
                     required
                     value={logEmail}
                     onChange={(e) => setLogEmail(e.target.value)}
@@ -294,6 +298,10 @@ export function AuthView() {
                       id="logPass"
                       type={showPass ? "text" : "password"}
                       autoComplete="current-password"
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      translate="no"
                       required
                       value={logPass}
                       onChange={(e) => setLogPass(e.target.value)}
@@ -336,6 +344,10 @@ export function AuthView() {
                     id="regEmail"
                     type="email"
                     autoComplete="email"
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    translate="no"
                     required
                     value={regEmail}
                     onChange={(e) => setRegEmail(e.target.value)}
@@ -347,6 +359,10 @@ export function AuthView() {
                   <Input
                     id="regName"
                     type="text"
+                    autoCapitalize="words"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    translate="no"
                     value={regName}
                     onChange={(e) => setRegName(e.target.value)}
                     placeholder="Ana García"
@@ -361,6 +377,10 @@ export function AuthView() {
                       id="regPass"
                       type={showPass ? "text" : "password"}
                       autoComplete="new-password"
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      translate="no"
                       required
                       value={regPass}
                       onChange={(e) => setRegPass(e.target.value)}
@@ -383,6 +403,10 @@ export function AuthView() {
                     id="regPass2"
                     type={showPass ? "text" : "password"}
                     autoComplete="new-password"
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    translate="no"
                     required
                     value={regPass2}
                     onChange={(e) => setRegPass2(e.target.value)}

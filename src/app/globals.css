@@ -61,9 +61,15 @@
   --muted-foreground: oklch(0.7 0.01 250);
   --accent: oklch(0.32 0.02 160);
   --accent-foreground: oklch(0.96 0.005 250);
-  --destructive: oklch(0.65 0.21 25);
-  --border: oklch(1 0 0 / 8%);
-  --input: oklch(1 0 0 / 10%);
+
+  /* Módulo 3: --destructive más vivo (chroma 0.21→0.24, lightness 0.65→0.62)
+     para que las alertas rojas resalten sobre el fondo oscuro. */
+  --destructive: oklch(0.62 0.24 25);
+
+  /* Módulo 3: --border subido de 8% → 14% para mejor contraste sobre dark. */
+  --border: oklch(1 0 0 / 14%);
+  --input: oklch(1 0 0 / 14%);
+
   --ring: oklch(0.72 0.17 160);
   --chart-1: oklch(0.72 0.17 160);
   --chart-2: oklch(0.7 0.18 80);
@@ -76,7 +82,7 @@
   --sidebar-primary-foreground: oklch(0.16 0.012 250);
   --sidebar-accent: oklch(0.27 0.015 250);
   --sidebar-accent-foreground: oklch(0.96 0.005 250);
-  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-border: oklch(1 0 0 / 14%);
   --sidebar-ring: oklch(0.72 0.17 160);
 }
 
@@ -95,9 +101,11 @@
   --muted-foreground: oklch(0.708 0 0);
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
+  /* Módulo 3: destructive más vivo en dark mode también. */
+  --destructive: oklch(0.639 0.21 22.216);
+  /* Módulo 3: border subido de 10% → 14%. */
+  --border: oklch(1 0 0 / 14%);
+  --input: oklch(1 0 0 / 16%);
   --ring: oklch(0.556 0 0);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
@@ -110,7 +118,7 @@
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-border: oklch(1 0 0 / 14%);
   --sidebar-ring: oklch(0.556 0 0);
 }
 
@@ -120,5 +128,18 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Módulo 3: suavizado de tipografías para nitidez en dark mode. */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  /* Módulo 3: focus visible con offset para accesibilidad (keyboard nav). */
+  *:focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+  }
+  /* Módulo 3: inputs nunca deben ser arrastrables ni seleccionables en masa. */
+  input,
+  textarea {
+    @apply select-text;
   }
 }

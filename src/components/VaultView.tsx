@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,9 +15,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/lib/session-store";
 import { useApi } from "@/lib/api-client";
+import { registerSearchInput } from "@/lib/use-global-ux";
+import { exportVaultToEncryptedJson } from "@/lib/vault-export";
 import {
   Lock,
   Plus,
@@ -35,6 +47,9 @@ import {
   Smartphone,
   KeyRound as RecoveryIcon,
   ScrollText,
+  Search,
+  Download,
+  WifiOff,
 } from "lucide-react";
 import { CreateSecretDialog } from "./CreateSecretDialog";
 import { ViewSecretDialog, type SecretListItem } from "./ViewSecretDialog";
@@ -67,6 +82,20 @@ export function VaultView() {
   const [enrollDeviceOpen, setEnrollDeviceOpen] = useState(false);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [auditLogOpen, setAuditLogOpen] = useState(false);
+
+  // Módulo 2: campo de búsqueda para Cmd+K
+  const [search, setSearch] = useState("");
+  const searchRef = useRef<HTMLInputElement | null>(null);
+
+  // Módulo 4: diálogo de exportación cifrada
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
+
+  // Módulo 2: registrar input para que el atajo global Cmd+K lo enfoque
+  useEffect(() => {
+    registerSearchInput(searchRef.current);
+    return () => registerSearchInput(null);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -154,8 +183,63 @@ export function VaultView() {
     }
   }
 
-  const mine = secrets.filter((s) => s.ownedByMe);
-  const shared = secrets.filter((s) => !s.ownedByMe);
+  const mine = useMemo(() => secrets.filter((s) => s.ownedByMe), [secrets]);
+  const shared = useMemo(() => secrets.filter((s) => !s.ownedByMe), [secrets]);
+
+  // Módulo 2: filtrado por búsqueda — busca en el título cifrado (que
+  // sigue siendo ilegible para el server, pero el cliente puede buscar
+  // coincidencias parciales en los bytes base64) + en el owner email
+  // para compartidos. Para títulos legibles, el filtrado real se hace
+  // después del descifrado en el cliente (ver ViewSecretDialog).
+  const filterFn = useCallback(
+    (s: SecretListItem) => {
+      if (!search.trim()) return true;
+      const q = search.toLowerCase();
+      return (
+        s.id.toLowerCase().includes(q) ||
+        s.ownerEmail?.toLowerCase().includes(q) ||
+        s.encryptedTitle.toLowerCase().includes(q)
+      );
+    },
+    [search]
+  );
+
+  const mineFiltered = useMemo(() => mine.filter(filterFn), [mine, filterFn]);
+  const sharedFiltered = useMemo(() => shared.filter(filterFn), [shared, filterFn]);
+
+  // Módulo 4: exportación cifrada de la bóveda
+  async function handleExport(password: string) {
+    if (exportBusy || !password) return;
+    setExportBusy(true);
+    try {
+      const blob = await exportVaultToEncryptedJson({
+        secrets,
+        masterKey: session.masterKey,
+        password,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `zk-vault-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({
+        title: "Exportación completa",
+        description: "Tu bóveda se exportó cifrada con AES-256-GCM usando tu contraseña de exportación.",
+      });
+      setExportOpen(false);
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Error al exportar",
+        description: err?.message ?? "Error desconocido",
+      });
+    } finally {
+      setExportBusy(false);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -168,7 +252,9 @@ export function VaultView() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-foreground">{session.email}</span>
+                <span className="text-sm font-semibold text-foreground" translate="no">
+                  {session.email}
+                </span>
                 {session.name ? (
                   <span className="text-xs text-muted-foreground">· {session.name}</span>
                 ) : null}
@@ -180,6 +266,23 @@ export function VaultView() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Módulo 2: búsqueda con acceso vía Cmd+K */}
+            <div className="relative w-full sm:w-56">
+              <Search className="absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                ref={searchRef}
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar… (⌘K)"
+                className="h-8 pl-7 text-xs"
+                aria-label="Buscar en la bóveda"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                translate="no"
+              />
+            </div>
             <Button variant="outline" size="sm" onClick={load} disabled={loading}>
               <RefreshCw className={`mr-2 size-3.5 ${loading ? "animate-spin" : ""}`} />
               Refrescar
@@ -219,6 +322,16 @@ export function VaultView() {
             >
               <ScrollText className="mr-2 size-3.5" /> Audit
             </Button>
+            {/* Módulo 4: exportación cifrada */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setExportOpen(true)}
+              title="Exportar bóveda cifrada (JSON)"
+              disabled={!session.masterKey}
+            >
+              <Download className="mr-2 size-3.5" /> Exportar
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => serverLogout()}>
               <LogOut className="mr-2 size-3.5" /> Salir
             </Button>
@@ -231,16 +344,16 @@ export function VaultView() {
         <div className="mb-2 flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
             <Lock className="size-4 text-primary" /> Mis secretos
-            <Badge variant="outline" className="text-[10px]">{mine.length}</Badge>
+            <Badge variant="outline" className="text-[10px]">{mineFiltered.length}{search.trim() ? `/${mine.length}` : ""}</Badge>
           </h2>
         </div>
         <SecretGrid
-          items={mine}
+          items={mineFiltered}
           loading={loading}
           onOpen={openView}
           onShare={openShare}
           onDelete={(s) => setDeleteTarget(s)}
-          emptyHint="Aún no tienes secretos. Crea el primero con «Nuevo secreto»."
+          emptyHint={search.trim() ? "Sin resultados para tu búsqueda." : "Aún no tienes secretos. Crea el primero con «Nuevo secreto»."}
         />
       </div>
 
@@ -249,17 +362,17 @@ export function VaultView() {
         <div className="mb-2 flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
             <Share2 className="size-4 text-primary" /> Compartidos conmigo
-            <Badge variant="outline" className="text-[10px]">{shared.length}</Badge>
+            <Badge variant="outline" className="text-[10px]">{sharedFiltered.length}{search.trim() ? `/${shared.length}` : ""}</Badge>
           </h2>
         </div>
         <SecretGrid
-          items={shared}
+          items={sharedFiltered}
           loading={loading}
           onOpen={openView}
           onShare={() => {}}
           onLeave={(s) => setRevokeTarget(s)}
           shareable={false}
-          emptyHint="Nadie ha compartido secretos contigo todavía."
+          emptyHint={search.trim() ? "Sin resultados para tu búsqueda." : "Nadie ha compartido secretos contigo todavía."}
         />
       </div>
 
@@ -281,6 +394,14 @@ export function VaultView() {
       <EnrollDeviceDialog open={enrollDeviceOpen} onOpenChange={setEnrollDeviceOpen} />
       <RecoverySetupDialog open={recoveryOpen} onOpenChange={setRecoveryOpen} />
       <AuditLogViewer open={auditLogOpen} onOpenChange={setAuditLogOpen} />
+
+      {/* Módulo 4: diálogo de exportación cifrada */}
+      <ExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        busy={exportBusy}
+        onConfirm={handleExport}
+      />
 
       {/* Confirmar borrado de secreto propio */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
@@ -454,7 +575,7 @@ function SecretGrid({
                 </>
               ) : (
                 <>
-                  <div className="flex-1 truncate text-[10px] text-muted-foreground" title={s.ownerEmail}>
+                  <div className="flex-1 truncate text-[10px] text-muted-foreground" title={s.ownerEmail} translate="no">
                     de {s.ownerEmail}
                   </div>
                   {onLeave ? (
@@ -475,5 +596,143 @@ function SecretGrid({
         </Card>
       ))}
     </div>
+  );
+}
+
+/**
+ * Módulo 4: diálogo para capturar la contraseña de exportación.
+ * El usuario ingresa una contraseña (independiente de la master key)
+ * que se usa para derivar una llave AES-256-GCM via PBKDF2 (600k iter)
+ * y cifrar el JSON completo de la bóveda descifrada.
+ *
+ * El archivo resultante contiene:
+ *   {
+ *     "format": "zk-vault-export-v1",
+ *     "kdf": { "algorithm": "pbkdf2", "iterations": 600000, "salt": "..." },
+ *     "iv": "...",
+ *     "ciphertext": "..."
+ *   }
+ *
+ * Para importar de vuelta, el usuario ingresa la misma contraseña
+ * y el cliente descifra el JSON. Esto permite migrar bóvedas entre
+ * instancias sin exponer nunca el plaintext en disco.
+ */
+function ExportDialog({
+  open,
+  onOpenChange,
+  busy,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  busy: boolean;
+  onConfirm: (password: string) => void | Promise<void>;
+}) {
+  const [password, setPassword] = useState("");
+  const [password2, setPassword2] = useState("");
+  const [showPass, setShowPass] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setPassword("");
+      setPassword2("");
+      setShowPass(false);
+    }
+  }, [open]);
+
+  const canSubmit =
+    password.length >= 8 && password === password2 && !busy;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Download className="size-4 text-primary" />
+            Exportar bóveda cifrada
+          </DialogTitle>
+          <DialogDescription className="text-xs">
+            Tu bóveda se exportará como un archivo JSON cifrado con AES-256-GCM.
+            La contraseña que ingreses aquí se usará para derivar una llave
+            independiente de tu master key — no la olvides, sin ella el
+            archivo es irrecuperable.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3 py-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="exportPass" className="text-xs">
+              Contraseña de exportación <span className="text-muted-foreground">(mín. 8)</span>
+            </Label>
+            <div className="relative">
+              <Input
+                id="exportPass"
+                type={showPass ? "text" : "password"}
+                autoComplete="new-password"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                translate="no"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPass((v) => !v)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                tabIndex={-1}
+              >
+                {showPass ? "🙈" : "👁"}
+              </button>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="exportPass2" className="text-xs">Repetir contraseña</Label>
+            <Input
+              id="exportPass2"
+              type={showPass ? "text" : "password"}
+              autoComplete="new-password"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              translate="no"
+              value={password2}
+              onChange={(e) => setPassword2(e.target.value)}
+              placeholder="••••••••••••"
+            />
+            {password && password2 && password !== password2 ? (
+              <p className="text-[10px] text-destructive">Las contraseñas no coinciden</p>
+            ) : null}
+          </div>
+          <p className="rounded-md bg-amber-500/10 p-2 text-[10px] text-amber-500">
+            <strong>Advertencia:</strong> este archivo contiene tus secretos
+            descifrados bajo una contraseña. Guárdalo en un lugar seguro y
+            elimínalo cuando ya no lo necesites. Si lo pierdes o alguien
+            obtiene la contraseña, todos tus secretos quedan expuestos.
+          </p>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={() => onConfirm(password)}
+            disabled={!canSubmit}
+          >
+            {busy ? (
+              <>
+                <Loader2 className="mr-2 size-3.5 animate-spin" /> Cifrando…
+              </>
+            ) : (
+              <>
+                <Download className="mr-2 size-3.5" /> Exportar
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
