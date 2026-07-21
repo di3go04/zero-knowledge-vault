@@ -137,7 +137,7 @@ describe("verifyChain", () => {
 
   it("detects when an entry's prevHash doesn't match the previous logHash", async () => {
     // Build a chain
-    const entries = [];
+    const entries: Array<{ prevHash: string | null; logHash: string | null; encryptedEvent: string; eventIv: string; createdAt: string }> = [];
     let prevHash: string | null = null;
     for (let i = 0; i < 3; i++) {
       const entry = {
@@ -160,7 +160,7 @@ describe("verifyChain", () => {
 
   it("detects when an entry's logHash was recomputed with tampered data", async () => {
     // Build a chain
-    const entries = [];
+    const entries: Array<{ prevHash: string | null; logHash: string | null; encryptedEvent: string; eventIv: string; createdAt: string }> = [];
     let prevHash: string | null = null;
     for (let i = 0; i < 3; i++) {
       const entry = {

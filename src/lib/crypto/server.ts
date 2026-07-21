@@ -85,7 +85,7 @@ export function validateBase64Blob(
  * Canonicaliza una JWK eliminando key_ops, ext y alg antes de ordenar.
  * Debe ser IDÉNTICA a la función del cliente (crypto-client.ts).
  */
-export function canonicalJwkString(jwk: Record<string, unknown>): string {
+export function canonicalJwkString(jwk: JsonWebKey | Record<string, unknown>): string {
   const {
     key_ops: _kops,
     ext: _ext,
@@ -100,7 +100,7 @@ export function canonicalJwkString(jwk: Record<string, unknown>): string {
 }
 
 export async function publicKeyFingerprint(
-  jwk: Record<string, unknown>,
+  jwk: JsonWebKey | Record<string, unknown>,
 ): Promise<string> {
   const canon = canonicalJwkString(jwk);
   const hash = await subtle.digest("SHA-256", new TextEncoder().encode(canon));
@@ -169,8 +169,8 @@ export async function verifyPopSignature(params: {
     return subtle.verify(
       { name: "RSA-PSS", saltLength: 32 },
       pubKey,
-      sigBytes as unknown as NodeJS.BufferSource,
-      msg as unknown as NodeJS.BufferSource,
+      sigBytes as BufferSource,
+      msg as BufferSource,
     );
   } catch {
     return false;
@@ -332,8 +332,8 @@ export async function verifyChallenge(params: {
     return subtle.verify(
       { name: "ECDSA", hash: "SHA-256" },
       publicKey,
-      signature as unknown as NodeJS.BufferSource,
-      challenge as unknown as NodeJS.BufferSource,
+      signature as BufferSource,
+      challenge as BufferSource,
     );
   } catch {
     return false;

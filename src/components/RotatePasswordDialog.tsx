@@ -106,14 +106,14 @@ export function RotatePasswordDialog({ open, onOpenChange, onRotated }: RotatePa
       const artifacts = await performPasswordRotation({
         oldPassword: oldPass,
         newPassword: newPass,
-        email: session.email,
-        currentKdfAlgorithm: loginData.kdfAlgorithm,
-        currentKdfSaltB64: loginData.kdfSalt,
-        currentKdfIterations: loginData.kdfIterations,
-        currentKdfMemoryKiB: loginData.kdfMemoryKiB,
-        currentKdfParallelism: loginData.kdfParallelism,
-        currentEncryptedPrivateKeyJwkB64: loginData.encryptedPrivateKeyJwk,
-        currentPrivateKeyIvB64: loginData.privateKeyIv,
+        email: session.email ?? "",
+        currentKdfAlgorithm: (loginData.kdfAlgorithm ?? "argon2id") as "argon2id" | "pbkdf2",
+        currentKdfSaltB64: loginData.kdfSalt ?? "",
+        currentKdfIterations: loginData.kdfIterations ?? 600_000,
+        currentKdfMemoryKiB: loginData.kdfMemoryKiB ?? undefined,
+        currentKdfParallelism: loginData.kdfParallelism ?? undefined,
+        currentEncryptedPrivateKeyJwkB64: loginData.encryptedPrivateKeyJwk ?? "",
+        currentPrivateKeyIvB64: loginData.privateKeyIv ?? "",
       });
 
       // 3. Enviar al servidor

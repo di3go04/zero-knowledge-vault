@@ -5,9 +5,6 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   reactStrictMode: false,
   // Use webpack instead of Turbopack for `next build` to avoid
   // native ESM module resolution issues with lightningcss.

@@ -66,7 +66,7 @@ export default function Home() {
     for (const key of forbidden) {
       if (key in window) {
         try {
-          delete (window as Record<string, unknown>)[key];
+          delete (window as unknown as Record<string, unknown>)[key];
         } catch {
           // ignore — read-only
         }

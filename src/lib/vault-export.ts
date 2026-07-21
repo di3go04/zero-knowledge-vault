@@ -244,11 +244,11 @@ export async function importVaultFromEncryptedJson(
 }
 
 // ----- helpers -----
-function base64ToBuf(b64: string): Uint8Array {
+function base64ToBuf(b64: string): ArrayBuffer {
   const binary = atob(b64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
+  return bytes.buffer as ArrayBuffer;
 }
 
 function bufToBase64(buf: ArrayBuffer | Uint8Array): string {

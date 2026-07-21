@@ -153,7 +153,7 @@ describe("Master password rotation flow (full re-encryption)", () => {
 
     // Create 3 secrets (simulating what the user has stored)
     const secretContents = ["secret-1-content", "secret-2-content", "secret-3-content"];
-    const encryptedSecrets = [];
+    const encryptedSecrets: Array<{ plaintext: string; ciphertext: string; iv: string }> = [];
     for (const content of secretContents) {
       const enc = await aesEncrypt(oldMasterKey, content);
       encryptedSecrets.push({
@@ -177,7 +177,7 @@ describe("Master password rotation flow (full re-encryption)", () => {
     const encryptedPrivNew = await encryptPrivateKey(newMasterKey, decryptedPrivKey);
 
     // Re-encrypt all secrets
-    const reencryptedSecrets = [];
+    const reencryptedSecrets: Array<{ plaintext: string; ciphertext: string; iv: string }> = [];
     for (const s of encryptedSecrets) {
       const plaintext = await aesDecrypt(oldMasterKey, s.ciphertext, s.iv);
       const reencrypted = await aesEncrypt(newMasterKey, plaintext);

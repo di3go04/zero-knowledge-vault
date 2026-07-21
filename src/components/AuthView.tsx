@@ -203,7 +203,7 @@ export function AuthView() {
         masterKey,
         privateKey,
         publicKey,
-        mlKemPrivateKey,
+        mlKemPrivateKey: undefined,
       });
 
       toast({

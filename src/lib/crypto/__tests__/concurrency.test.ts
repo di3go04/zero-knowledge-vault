@@ -39,7 +39,7 @@ const db = canRunTests
 beforeAll(async () => {
   if (!db) return;
   try {
-    await db.$connect();
+    await db!.$connect();
   } catch (e) {
     console.warn("Concurrency test setup failed:", String(e));
   }
@@ -48,7 +48,7 @@ beforeAll(async () => {
 afterAll(async () => {
   if (!db) return;
   try {
-    await db.$disconnect();
+    await db!.$disconnect();
   } catch {
     // ignore
   }
@@ -60,14 +60,14 @@ const itIfDb = canRunTests ? it : it.skip;
 describe("Concurrencia /api/secrets — acceso a BD", () => {
   itIfDb("maneja 50 lecturas paralelas sin errores", async () => {
     // Asumiendo que existe al menos un usuario en la BD de test
-    const user = await db.user.findFirst();
+    const user = await db!.user.findFirst();
     if (!user) {
       console.warn("Skipping: no user in test DB");
       return;
     }
 
     const promises = Array.from({ length: 50 }, () =>
-      db.secretKeyShare.findMany({
+      db!.secretKeyShare.findMany({
         where: { recipientId: user.id },
         take: 100,
       }),
@@ -90,14 +90,14 @@ describe("Concurrencia /api/secrets — acceso a BD", () => {
   });
 
   itIfDb("maneja 10 escrituras paralelas en el mismo usuario sin deadlock", async () => {
-    const user = await db.user.findFirst();
+    const user = await db!.user.findFirst();
     if (!user) {
       console.warn("Skipping: no user in test DB");
       return;
     }
 
     const promises = Array.from({ length: 10 }, (_, i) =>
-      db.secret.create({
+      db!.secret.create({
         data: {
           ownerId: user.id,
           encryptedTitle: `concurrency-test-${i}-${Date.now()}`,
@@ -114,13 +114,13 @@ describe("Concurrencia /api/secrets — acceso a BD", () => {
     expect(ok.length).toBe(10);
 
     // Limpiar
-    await db.secret.deleteMany({
+    await db!.secret.deleteMany({
       where: { encryptedTitle: { contains: "concurrency-test-" } },
     });
   });
 
   itIfDb("transacciones son atómicas — rollback en error", async () => {
-    const user = await db.user.findFirst();
+    const user = await db!.user.findFirst();
     if (!user) {
       console.warn("Skipping: no user in test DB");
       return;
@@ -129,7 +129,7 @@ describe("Concurrencia /api/secrets — acceso a BD", () => {
     // Intentar crear un secreto + share en transacción, forzando error
     // en el segundo paso (secretId inválido) → debe hacer rollback.
     await expect(
-      db.$transaction(async (tx) => {
+      db!.$transaction(async (tx) => {
         const secret = await tx.secret.create({
           data: {
             ownerId: user.id,
@@ -151,7 +151,7 @@ describe("Concurrencia /api/secrets — acceso a BD", () => {
     ).rejects.toThrow();
 
     // Verificar que el secreto NO quedó creado (rollback funcionó)
-    const leaked = await db.secret.findFirst({
+    const leaked = await db!.secret.findFirst({
       where: { encryptedTitle: "tx-rollback-test" },
     });
     expect(leaked).toBeNull();
@@ -159,15 +159,15 @@ describe("Concurrencia /api/secrets — acceso a BD", () => {
 
   itIfDb("aislamiento entre usuarios — secretos de A no aparecen en B", async () => {
     // Crear 2 usuarios
-    const userA = await db.user.create({
+    const userA = await db!.user.create({
       data: { email: `concurrency-a-${Date.now()}@test.local` },
     });
-    const userB = await db.user.create({
+    const userB = await db!.user.create({
       data: { email: `concurrency-b-${Date.now()}@test.local` },
     });
 
     // Crear secreto solo para A
-    await db.secret.create({
+    await db!.secret.create({
       data: {
         ownerId: userA.id,
         encryptedTitle: "secret-for-A-only",
@@ -178,13 +178,13 @@ describe("Concurrencia /api/secrets — acceso a BD", () => {
     });
 
     // Consultar secretos de B → no debe incluir el de A
-    const secretsB = await db.secret.findMany({
+    const secretsB = await db!.secret.findMany({
       where: { ownerId: userB.id },
     });
     expect(secretsB.length).toBe(0);
 
     // Limpiar
-    await db.user.delete({ where: { id: userA.id } });
-    await db.user.delete({ where: { id: userB.id } });
+    await db!.user.delete({ where: { id: userA.id } });
+    await db!.user.delete({ where: { id: userB.id } });
   });
 });
