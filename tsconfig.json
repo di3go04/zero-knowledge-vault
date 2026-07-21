@@ -48,6 +48,8 @@
     "upload",
     "download",
     "src-mobile",
-    "src-desktop"
+    "src-desktop",
+    "packages",
+    "tests"
   ]
 }

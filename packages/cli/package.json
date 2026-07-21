@@ -1,0 +1,16 @@
+{
+  "name": "@zk-vault/cli",
+  "version": "0.1.0",
+  "description": "CLI tool for Zero-Knowledge Vault — manage secrets from the terminal.",
+  "type": "module",
+  "bin": {
+    "zk-vault": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "bun src/index.ts"
+  },
+  "dependencies": {
+    "@zk-vault/crypto": "file:../crypto"
+  },
+  "license": "MIT"
+}

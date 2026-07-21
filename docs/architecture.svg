@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" font-family="monospace" font-size="12">
+  <rect width="800" height="600" fill="#0a0e1a"/>
+  <text x="400" y="30" text-anchor="middle" fill="#72dd8c" font-size="16" font-weight="bold">Zero-Knowledge Vault — Architecture</text>
+  <rect x="50" y="60" width="300" height="200" fill="none" stroke="#72dd8c" stroke-width="2" rx="8"/>
+  <text x="200" y="85" text-anchor="middle" fill="#72dd8c">CLIENT (Browser)</text>
+  <rect x="70" y="100" width="260" height="30" fill="#1a2030" rx="4"/><text x="200" y="120" text-anchor="middle" fill="#aaa">Web Crypto API</text>
+  <rect x="70" y="140" width="260" height="30" fill="#1a2030" rx="4"/><text x="200" y="160" text-anchor="middle" fill="#aaa">Argon2id Worker</text>
+  <rect x="70" y="180" width="260" height="30" fill="#1a2030" rx="4"/><text x="200" y="200" text-anchor="middle" fill="#aaa">AES-256-GCM + RSA-OAEP</text>
+  <rect x="70" y="220" width="260" height="30" fill="#1a2030" rx="4"/><text x="200" y="240" text-anchor="middle" fill="#aaa">ML-KEM-768</text>
+  <rect x="450" y="60" width="300" height="200" fill="none" stroke="#dd7272" stroke-width="2" rx="8"/>
+  <text x="600" y="85" text-anchor="middle" fill="#dd7272">SERVER (Next.js)</text>
+  <rect x="470" y="100" width="260" height="30" fill="#1a2030" rx="4"/><text x="600" y="120" text-anchor="middle" fill="#aaa">19 API Endpoints</text>
+  <rect x="470" y="140" width="260" height="30" fill="#1a2030" rx="4"/><text x="600" y="160" text-anchor="middle" fill="#aaa">Prisma ORM</text>
+  <rect x="470" y="180" width="260" height="30" fill="#1a2030" rx="4"/><text x="600" y="200" text-anchor="middle" fill="#aaa">Rate Limiting</text>
+  <line x1="350" y1="160" x2="450" y2="160" stroke="#aaa" stroke-width="2"/>
+  <text x="400" y="155" text-anchor="middle" fill="#aaa" font-size="10">HTTPS</text>
+  <rect x="250" y="320" width="300" height="80" fill="none" stroke="#7298dd" stroke-width="2" rx="8"/>
+  <text x="400" y="365" text-anchor="middle" fill="#7298dd">DATABASE (6 models)</text>
+  <text x="100" y="570" fill="#555" font-size="10">Server NEVER receives: masterPassword, masterKey, privateKey, plaintext</text>
+</svg>
