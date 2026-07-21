@@ -171,10 +171,6 @@ jobs:
         env:
           DATABASE_URL: "postgresql://user:pass@localhost:5432/test"
 
-      - name: Setup database
-        run: bunx prisma db push --force-reset
-        env:
-          DATABASE_URL: "postgresql://user:pass@localhost:5432/test"
 
       - name: Install Playwright
         run: bun add -d @playwright/test && npx playwright install --with-deps chromium
@@ -279,10 +275,6 @@ jobs:
         env:
           DATABASE_URL: "postgresql://user:pass@localhost:5432/test"
 
-      - name: Setup database
-        run: bunx prisma db push --force-reset
-        env:
-          DATABASE_URL: "postgresql://user:pass@localhost:5432/test"
 
       - name: Build
         run: bun run build
