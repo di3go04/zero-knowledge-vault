@@ -124,12 +124,22 @@ export function ViewSecretDialog({ open, onOpenChange, secret }: ViewSecretDialo
   function handleCopy() {
     navigator.clipboard.writeText(content).then(() => {
       setCopied(true);
-      toast({ title: "Copiado al portapapeles" });
+      toast({
+        title: "Copiado al portapapeles",
+        description: "Se borrará automáticamente en 30 segundos para tu seguridad.",
+      });
       // Limpiar portapapeles tras 30s (best effort)
       setTimeout(() => {
         navigator.clipboard.writeText("").catch(() => {});
+        toast({ title: "Portapapeles limpiado", description: "El contenido sensible ha sido borrado." });
       }, 30_000);
       setTimeout(() => setCopied(false), 1500);
+    }).catch(() => {
+      toast({
+        variant: "destructive",
+        title: "Error al copiar",
+        description: "No se pudo acceder al portapapeles. Verifica los permisos del navegador.",
+      });
     });
   }
 
