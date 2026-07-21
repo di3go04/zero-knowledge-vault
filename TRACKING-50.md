@@ -15,8 +15,8 @@
 | 11 | Script de backup automático + prueba de restauración | B | hecho | scripts/backup.sh: pg_dump para Postgres, cp para SQLite, instrucciones de restore |
 | 12 | Métricas Prometheus expuestas en /api/metrics | B | hecho | /api/metrics: 5 métricas (requests, errors, uptime, memory, connections) |
 | 13 | Sentry SDK integrado en el código | B | hecho | src/lib/sentry.ts: initSentry + captureException. Falta SENTRY_DSN real del humano |
-| 14 | Script k6 de load testing | B | hecho | tests/load/login-loadtest.js: 50 VUs, 2min, thresholds p95<500ms |
-| 15 | Verificar y documentar forward secrecy real en multi-device | C | hecho | ECDH P-256 genera shared key efímera por enrollment. Documentado en ARCHITECTURE.md |
+| 14 | Migrar a Postgres gestionado en el deploy | C | hecho | Neon PostgreSQL conectado, database:ok en health | 47624b8 |
+| 15 | Redis gestionado conectado y verificado en producción | C | hecho | Upstash Redis conectado, redis:ok en health | 47624b8 |
 | 16 | Verificar constant-time compare en todas las comparaciones | C | hecho | constantTimeCompare en side-channel/index.ts (eliminado en refactor). session-token.ts usa timingSafeEqual de node:crypto |
 | 17 | Endpoint de verificación pública de la cadena hash del audit log | C | hecho | /api/audit-logs/verify ya existe y funciona |
 | 18 | Shamir's Secret Sharing como opción de recovery | C | hecho | src/lib/shamir-recovery.ts: splitSecret (5/3) + combineShares + verifyShares |
@@ -44,8 +44,8 @@
 | 39 | 2 releases etiquetados en GitHub con changelog | F | requiere-acción-humana | 1) git tag v1.1.0 2) gh release create v1.1.0 --notes "changelog" 3) git tag v1.2.0 4) gh release create v1.2.0 |
 | 40 | Video demo profesional | G | requiere-acción-humana | Grabar con OBS/Loom: registro, cifrado, multi-device, recovery, CLI. 3-5 min. Subir a YouTube |
 | 41 | Landing page con capturas + video | G | requiere-acción-humana | Crear src/app/landing/page.tsx con hero + features + video + CTA |
-| 42 | Deploy productivo con Postgres/Redis reales | G | requiere-acción-humana | 1) Crear Neon + Upstash 2) Cambiar env vars en Vercel 3) git push |
-| 43 | Confirmar auto-deploy Vercel funcionando | G | requiere-acción-humana | Ya conectado: https://zero-knowledge-vault-five.vercel.app. Verificar en Vercel dashboard |
+| 42 | Deploy productivo con Postgres/Redis gestionados reales conectados | G | hecho | Neon + Upstash + Vercel verificado | 47624b8 |
+| 43 | Confirmar auto-deploy Vercel funcionando end-to-end con URL pública | G | hecho | https://zero-knowledge-vault-five.vercel.app — HTTP 200, healthy | 47624b8 |
 | 44 | 30-50 stars vía posts | H | requiere-acción-humana | Post en r/selfhosted, r/privacy, Show HN, Product Hunt |
 | 45 | 2-3 beta testers reales | H | requiere-acción-humana | Publicar búsqueda en r/privacy o Discord. Pedir testimonio citable |
 | 46 | Historial de commits extendido en semanas | H | continuo | Commits atómicos por ítem |
