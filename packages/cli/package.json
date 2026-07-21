@@ -9,8 +9,20 @@
   "scripts": {
     "start": "bun src/index.ts"
   },
-  "dependencies": {
-    "@zk-vault/crypto": "file:../crypto"
-  },
-  "license": "MIT"
+  "files": [
+    "src/",
+    "README.md"
+  ],
+  "keywords": [
+    "cli",
+    "password-manager",
+    "zero-knowledge",
+    "encryption",
+    "security"
+  ],
+  "author": "ZK Vault Team",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
 }
