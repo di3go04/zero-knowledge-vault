@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      DATABASE_URL: "file:./db/test.db"
+      DATABASE_URL: "postgresql://user:pass@localhost:5432/test"
       SESSION_SECRET: "ci-test-secret-min-32-characters-long!!"
 
     steps:
@@ -47,7 +47,7 @@ jobs:
       - name: Generate Prisma Client
         run: bunx prisma generate
         env:
-          DATABASE_URL: "file:./db/test.db"
+          DATABASE_URL: "postgresql://user:pass@localhost:5432/test"
 
       - name: Run ESLint (security + no-unsanitized)
         run: bun run lint
@@ -58,7 +58,7 @@ jobs:
       - name: Prisma schema validation
         run: bunx prisma validate
         env:
-          DATABASE_URL: "file:./db/test.db"
+          DATABASE_URL: "postgresql://user:pass@localhost:5432/test"
 
       - name: Crypto implementation audit
         run: node scripts/crypto-audit.mjs || true
@@ -84,7 +84,7 @@ jobs:
     timeout-minutes: 10
     needs: lint-and-typecheck
     env:
-      DATABASE_URL: "file:./db/test.db"
+      DATABASE_URL: "postgresql://user:pass@localhost:5432/test"
       SESSION_SECRET: "ci-test-secret-min-32-characters-long!!"
       NODE_ENV: "test"
 
@@ -103,7 +103,7 @@ jobs:
       - name: Generate Prisma Client
         run: bunx prisma generate
         env:
-          DATABASE_URL: "file:./db/test.db"
+          DATABASE_URL: "postgresql://user:pass@localhost:5432/test"
 
       - name: Run unit tests (BLOQUE 3 — fails build on test failure)
         run: bun run test
@@ -148,7 +148,7 @@ jobs:
           --health-retries 3
 
     env:
-      DATABASE_URL: "file:./db/test.db"
+      DATABASE_URL: "postgresql://user:pass@localhost:5432/test"
       SESSION_SECRET: "ci-test-secret-min-32-characters-long!!"
       REDIS_URL: "redis://localhost:6379"
       DECOY_HMAC_KEY: "ci-test-decoy-key"
@@ -169,12 +169,12 @@ jobs:
       - name: Generate Prisma Client
         run: bunx prisma generate
         env:
-          DATABASE_URL: "file:./db/test.db"
+          DATABASE_URL: "postgresql://user:pass@localhost:5432/test"
 
       - name: Setup database
         run: bunx prisma db push --force-reset
         env:
-          DATABASE_URL: "file:./db/test.db"
+          DATABASE_URL: "postgresql://user:pass@localhost:5432/test"
 
       - name: Install Playwright
         run: bun add -d @playwright/test && npx playwright install --with-deps chromium
@@ -185,7 +185,7 @@ jobs:
           sleep 15
           curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/ || true
         env:
-          DATABASE_URL: "file:./db/test.db"
+          DATABASE_URL: "postgresql://user:pass@localhost:5432/test"
           SESSION_SECRET: "ci-test-secret-min-32-characters-long!!"
           REDIS_URL: "redis://localhost:6379"
           DECOY_HMAC_KEY: "ci-test-decoy-key"
@@ -277,17 +277,17 @@ jobs:
       - name: Generate Prisma Client
         run: bunx prisma generate
         env:
-          DATABASE_URL: "file:./db/test.db"
+          DATABASE_URL: "postgresql://user:pass@localhost:5432/test"
 
       - name: Setup database
         run: bunx prisma db push --force-reset
         env:
-          DATABASE_URL: "file:./db/test.db"
+          DATABASE_URL: "postgresql://user:pass@localhost:5432/test"
 
       - name: Build
         run: bun run build
         env:
-          DATABASE_URL: "file:./db/test.db"
+          DATABASE_URL: "postgresql://user:pass@localhost:5432/test"
           SESSION_SECRET: "ci-build-test-secret-min-32-chars!!"
           NODE_ENV: "production"
 
