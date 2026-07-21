@@ -79,3 +79,4 @@ skills/
 # Optional: package-lock files (we use bun.lock)
 package-lock.json
 yarn.lock
+.env*
