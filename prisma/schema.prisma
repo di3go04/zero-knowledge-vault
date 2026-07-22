@@ -182,3 +182,22 @@ model ApiKey {
   @@index([userId])
   @@index([keyHash])
 }
+
+// ---------------------------------------------------------------------
+// Dead Man's Switch: notifica a destinatarios si el usuario no
+// renueva su "pulse" (check-in) antes del plazo configurado.
+// ---------------------------------------------------------------------
+model DeadManSwitch {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  enabled       Boolean  @default(true)
+  gracePeriodMs Int      @default(86400000) // 24h por defecto
+  lastPulseAt   DateTime @default(now())
+  notifyEmail   String   // destinatario de la notificación
+  message       String?  // mensaje personalizado opcional
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+  @@index([lastPulseAt])
+}
