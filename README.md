@@ -184,7 +184,7 @@ Ver [`.env.example`](./.env.example) para la lista completa. Las obligatorias so
 - `DATABASE_URL` — SQLite (dev) o PostgreSQL (prod)
 - `SESSION_SECRET` — Mínimo 32 caracteres, aleatorio
 
-Opcionales: `REDIS_URL`, `DECOY_HMAC_KEY`, `LOG_LEVEL`.
+Opcionales: `REDIS_URL`, `SENTRY_DSN`, `SMTP_*`, `CRON_SECRET`, `METRICS_ADMIN_SECRET`, `DECOY_HMAC_KEY`, `LOG_LEVEL`.
 
 ---
 
@@ -228,12 +228,24 @@ Opcionales: `REDIS_URL`, `DECOY_HMAC_KEY`, `LOG_LEVEL`.
 ## Testing
 
 ```bash
-# Ejecutar los 119 tests
+# Ejecutar todos los tests (CI: SQLite in-memory automático)
 bun run test
 
 # Con coverage
 bun run test:coverage
+
+# En modo watch
+bun run test:watch
 ```
+
+### Tests en CI vs Local
+
+| Entorno | Base de datos | Redis |
+|---------|--------------|-------|
+| **CI (GitHub Actions)** | SQLite in-memory automático (vitest.setup.ts) | No disponible — fallback a DB/Map |
+| **Local (dev)** | SQLite (./db/custom.db) vía .env | Opcional via REDIS_URL |
+
+Los tests no requieren PostgreSQL. El setup `vitest.setup.ts` detecta la ausencia de `DATABASE_URL` y crea una base SQLite temporal automáticamente.
 
 ### Cobertura actual (módulo crypto)
 
@@ -249,7 +261,7 @@ bun run test:coverage
 
 Las líneas no cubiertas en `client.ts` son paths de Argon2id worker que solo se ejercen en navegador real con Web Worker.
 
-### Suites de tests (8 archivos, 119 tests)
+### Suites de tests (22 archivos, 205 tests)
 
 - `hkdf.test.ts` (7) — HKDF-SHA256 derivation
 - `memory.test.ts` (14) — zeroization de buffers y CryptoKeys
@@ -259,6 +271,37 @@ Las líneas no cubiertas en `client.ts` son paths de Argon2id worker que solo se
 - `extras.test.ts` (10) — recovery, audit, fingerprint cache
 - `integration.test.ts` (7) — flujos end-to-end
 - `hash-chain.test.ts` (14) — tamper-evident audit chain
+- `concurrency.test.ts` (4) — concurrencia en acceso a BD
+- `rate-limit-email.test.ts` (5) — rate limit por email en login
+- `api-key-auth.test.ts` (8) — API Keys con persistencia en DB
+- `dead-mans-switch.test.ts` (8) — Dead Man's Switch persistente
+- `onepassword-adapter.test.ts` (7) — Importador .1pux real
+- `metrics-store.test.ts` (5) — Métricas en DB/Redis
+
+### Deployment
+
+```bash
+# 1. Configurar base de datos (producción)
+#    - Usar PostgreSQL en lugar de SQLite
+#    - Cambiar provider en prisma/schema.prisma a "postgresql"
+#    - Configurar DATABASE_URL en Vercel env vars
+
+# 2. Ejecutar migraciones
+bun run db:migrate:deploy
+
+# 3. Configurar Vercel Cron (opcional)
+#    - El archivo vercel.json incluye el schedule para /api/cron/dead-mans-switch
+#    - Configurar CRON_SECRET en Vercel env vars
+
+# 4. Variables de entorno requeridas en producción
+#    - DATABASE_URL (PostgreSQL)
+#    - SESSION_SECRET (min 32 chars, aleatorio)
+#    Opcionales:
+#    - REDIS_URL (para rate-limit distribuido + blacklist + métricas)
+#    - SENTRY_DSN (error reporting)
+#    - SMTP_HOST, SMTP_USER, SMTP_PASS (notificaciones email)
+#    - CRON_SECRET (protección endpoint cron)
+#    - METRICS_ADMIN_SECRET (protección POST /api/metrics)
 
 ---
 
