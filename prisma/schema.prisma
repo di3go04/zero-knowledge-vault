@@ -201,3 +201,14 @@ model DeadManSwitch {
   @@index([userId])
   @@index([lastPulseAt])
 }
+
+// ---------------------------------------------------------------------
+// Métricas de uso del sistema (request count, actividad reciente).
+// ---------------------------------------------------------------------
+model Metric {
+  id    String @id @default(cuid())
+  name  String @unique // "request_count", "last_active_timestamps"
+  value Int    @default(0)
+
+  @@index([name])
+}
