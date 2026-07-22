@@ -132,6 +132,7 @@ export async function POST(req: NextRequest) {
       mlKemPublicKey: km.mlKemPublicKey,
       publicKeyJwk: JSON.parse(km.publicKeyJwk),
       publicKeyFingerprint: fingerprint,
+      cryptoVersion: km.cryptoVersion ?? 1,
       sessionToken,
       expiresAt,
       isDecoy: false,

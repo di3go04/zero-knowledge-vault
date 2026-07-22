@@ -96,7 +96,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // -------- Actualizar BD --------
+  // -------- Actualizar BD con version increment --------
+  const currentKm = user.keyMaterial;
+  const newCryptoVersion = (currentKm.cryptoVersion ?? 1) + 1;
+
   await db.userKeyMaterial.update({
     where: { userId },
     data: {
@@ -108,6 +111,7 @@ export async function POST(req: NextRequest) {
       encryptedPrivateKeyJwk: newEncryptedPrivateKeyJwk,
       privateKeyIv: newPrivateKeyIv,
       popSignature: newPopSignature,
+      cryptoVersion: newCryptoVersion,
       // publicKeyJwk y publicKeyFingerprint NO cambian
     },
   });
@@ -140,6 +144,7 @@ export async function POST(req: NextRequest) {
     newKdfAlgorithm,
     newKdfSalt,
     newKdfIterations,
+    cryptoVersion: newCryptoVersion,
     publicKeyFingerprint: serverFingerprint, // sin cambios
     note: "Contraseña maestra rotada. La privateKey RSA no cambió — las wrappedKeys y shares existentes siguen siendo válidas. Todos los tokens de sesión han sido invalidados; debes re-login en todos tus dispositivos.",
   });

@@ -92,6 +92,10 @@ model UserKeyMaterial {
   encryptedMlKemPrivateKey String?
   mlKemPrivateKeyIv      String?
 
+  // Key Versioning — cada rotación incrementa la versión
+  cryptoVersion          Int      @default(1)
+  keyCompromisedAt       DateTime?
+
   // Recovery Key (BIP-39) — backup cifrado de la privateKey RSA
   recoverySalt           String?
   recoveryIterations     Int?
@@ -136,6 +140,7 @@ model SecretKeyShare {
   recipientId         String
   recipient           User     @relation(fields: [recipientId], references: [id], onDelete: Cascade)
   wrappedSymmetricKey String
+  wrappingKeyVersion  Int      @default(1)
   role                String   @default("readonly")
   seenAt              DateTime?
   createdAt           DateTime @default(now())
