@@ -4,5 +4,11 @@
   "buildCommand": "bun run build",
   "installCommand": "bun install",
   "devCommand": "bun run dev",
-  "regions": ["iad1"]
+  "regions": ["iad1"],
+  "crons": [
+    {
+      "path": "/api/cron/dead-mans-switch",
+      "schedule": "0 0 * * *"
+    }
+  ]
 }
