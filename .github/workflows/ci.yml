@@ -22,7 +22,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      DATABASE_URL: "postgresql://user:pass@localhost:5432/test"
       SESSION_SECRET: "ci-test-secret-min-32-characters-long!!"
 
     steps:
@@ -46,8 +45,6 @@ jobs:
 
       - name: Generate Prisma Client
         run: bunx prisma generate
-        env:
-          DATABASE_URL: "postgresql://user:pass@localhost:5432/test"
 
       - name: Run ESLint (security + no-unsanitized)
         run: bun run lint
@@ -57,8 +54,6 @@ jobs:
 
       - name: Prisma schema validation
         run: bunx prisma validate
-        env:
-          DATABASE_URL: "postgresql://user:pass@localhost:5432/test"
 
       - name: Crypto implementation audit
         run: node scripts/crypto-audit.mjs || true
@@ -82,9 +77,7 @@ jobs:
     name: Unit Tests (Vitest)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: lint-and-typecheck
     env:
-      DATABASE_URL: "postgresql://user:pass@localhost:5432/test"
       SESSION_SECRET: "ci-test-secret-min-32-characters-long!!"
       NODE_ENV: "test"
 
@@ -102,8 +95,6 @@ jobs:
 
       - name: Generate Prisma Client
         run: bunx prisma generate
-        env:
-          DATABASE_URL: "postgresql://user:pass@localhost:5432/test"
 
       - name: Run unit tests (BLOQUE 3 — fails build on test failure)
         run: bun run test
@@ -127,7 +118,35 @@ jobs:
           retention-days: 7
 
   # ===================================================================
-  # Job 3: Tests E2E (Playwright) — continue-on-error
+  # Job 3: CLI Build
+  # ===================================================================
+  cli-build:
+    name: CLI Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SESSION_SECRET: "ci-test-secret-min-32-characters-long!!"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build CLI
+        run: cd packages/cli && bun run build
+
+      - name: Verify CLI output
+        run: test -f packages/cli/dist/index.js && echo "✓ CLI built successfully"
+
+  # ===================================================================
+  # Job 4: Tests E2E (Playwright) — continue-on-error
   # ===================================================================
   e2e-tests:
     name: E2E Tests (Playwright)
@@ -195,7 +214,7 @@ jobs:
         run: echo "✓ No-leak assertion passed"
 
   # ===================================================================
-  # Job 3: Security Audit
+  # Job 5: Security Audit
   # ===================================================================
   security-audit:
     name: Security Audit
@@ -250,7 +269,7 @@ jobs:
           echo "✅ Schema Prisma sin campos sensibles" >> $GITHUB_STEP_SUMMARY
 
   # ===================================================================
-  # Job 4: Build verification
+  # Job 6: Build verification
   # ===================================================================
   build:
     name: Build Verification
@@ -272,9 +291,6 @@ jobs:
 
       - name: Generate Prisma Client
         run: bunx prisma generate
-        env:
-          DATABASE_URL: "postgresql://user:pass@localhost:5432/test"
-
 
       - name: Build
         run: bun run build
