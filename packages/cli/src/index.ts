@@ -10,7 +10,7 @@
  *   zk-vault share <secretId> <recipientEmail>
  *   zk-vault export <output-file>
  */
-import { deriveMasterKey, aesEncrypt, aesDecrypt, pbkdf2LegacyParams, randomBytes, bufToBase64, base64ToBuf } from "../../src/lib/crypto";
+import { deriveMasterKey, aesEncrypt, aesDecrypt, pbkdf2LegacyParams, randomBytes, bufToBase64, base64ToBuf } from "@zk-vault/crypto";
 
 const VAULT_URL = process.env.VAULT_URL || "http://localhost:3000";
 

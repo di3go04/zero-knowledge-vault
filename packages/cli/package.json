@@ -4,13 +4,17 @@
   "description": "CLI tool for Zero-Knowledge Vault — manage secrets from the terminal.",
   "type": "module",
   "bin": {
-    "zk-vault": "./src/index.ts"
+    "zk-vault": "./dist/index.js"
   },
+  "main": "./dist/index.js",
   "scripts": {
-    "start": "bun src/index.ts"
+    "start": "bun src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target bun --format esm --external '@zk-vault/*'",
+    "postbuild": "bunx chmod +x dist/index.js 2>/dev/null || true"
   },
   "files": [
     "src/",
+    "dist/",
     "README.md"
   ],
   "keywords": [
