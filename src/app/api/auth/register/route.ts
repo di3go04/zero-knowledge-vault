@@ -23,10 +23,18 @@ import {
   verifyPopSignature,
 } from "@/lib/crypto/server";
 import { registerSchema, validatePayload } from "@/lib/validation-schemas";
+import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 
 const NAME_MAX_LEN = 100;
 
 export async function POST(req: NextRequest) {
+  const ip = getClientIp(req);
+  const ipRl = await checkRateLimit(`register:ip:${ip}`, 10, 60 * 60 * 1000);
+  if (!ipRl.allowed) {
+    logger.warn({ ip }, "register rate limited");
+    return rateLimitResponse(ipRl.retryAfterSeconds, ipRl.remaining);
+  }
+
   let body: any;
   try {
     body = await req.json();

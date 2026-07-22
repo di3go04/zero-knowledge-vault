@@ -33,6 +33,7 @@ model User {
   ownedSecrets    Secret[]
   secretKeyShares SecretKeyShare[]
   devices         Device[]
+  passkeys        Passkey[]
   auditLogs       AuditLog[]
 }
 
@@ -181,6 +182,37 @@ model ApiKey {
 
   @@index([userId])
   @@index([keyHash])
+}
+
+// ---------------------------------------------------------------------
+// Passkey (WebAuthn) — segundo factor de autenticación opcional.
+// ---------------------------------------------------------------------
+// Cada usuario puede registrar múltiples passkeys (biométricas, PIN,
+// llave de seguridad USB). La passkey es un segundo factor: el login
+// normal (email) sigue ocurriendo, pero si el usuario tiene passkeys
+// registradas, debe autenticarse con una para obtener el token de
+// sesión completo.
+//
+// Solo se almacena la publicKey ECDSA P-256 (raw bytes, 65 bytes).
+// El servidor nunca recibe ni almacena biometría, PIN, ni material
+// sensible del autenticador.
+// ---------------------------------------------------------------------
+model Passkey {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialId    String   @unique // base64url del raw credential ID
+  publicKey       String   // raw EC public key P-256 (base64, 65 bytes: 0x04 + x + y)
+  algorithm       Int      // -7 = ES256 (ECDSA P-256 SHA-256)
+  aaguid          String   // AAGUID del autenticador (hex)
+  transports      String   // JSON array: ["usb", "nfc", "ble", "internal"]
+  deviceName      String?  // nombre descriptivo asignado por el usuario
+  createdAt       DateTime @default(now())
+  lastUsedAt      DateTime @default(now())
+  backedUp        Boolean  @default(false)
+  counter         Int      @default(0) // contador de uso (anti-clonación)
+
+  @@index([userId])
 }
 
 // ---------------------------------------------------------------------

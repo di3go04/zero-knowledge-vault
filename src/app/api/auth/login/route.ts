@@ -25,6 +25,7 @@ import { issueSessionToken, SESSION_TTL } from "@/lib/session-token";
 import { loginSchema, validatePayload } from "@/lib/validation-schemas";
 import { logger } from "@/lib/logger";
 import { checkRateLimit, resetRateLimit, getClientIp, RATE_LIMIT_POLICIES, rateLimitResponse } from "@/lib/rate-limit";
+import { generateLoginOptions } from "@/lib/webauthn";
 
 export async function POST(req: NextRequest) {
   let body: any;
@@ -72,6 +73,43 @@ export async function POST(req: NextRequest) {
   if (user && user.keyMaterial) {
     await resetRateLimit(rlKey);
 
+    // Check if user has passkeys registered (2FA)
+    const passkeyCount = await db.passkey.count({ where: { userId: user.id } });
+
+    if (passkeyCount > 0) {
+      // User has passkeys — require 2FA before issuing session token
+      const userPasskeys = await db.passkey.findMany({
+        where: { userId: user.id },
+        select: { credentialId: true, transports: true },
+      });
+
+      const parsedTransports = userPasskeys.map((p) => {
+        try {
+          return { credentialId: p.credentialId, transports: JSON.parse(p.transports) as string[] };
+        } catch {
+          return { credentialId: p.credentialId, transports: ["internal"] as string[] };
+        }
+      });
+
+      const options = generateLoginOptions(user.id, parsedTransports);
+
+      logger.info({ userId: user.id, email: user.email }, "passkey login started (2FA required)");
+      return NextResponse.json({
+        passkeyRequired: true,
+        passkeyChallenge: options,
+        email: user.email,
+        name: user.name,
+        // Return partial data needed for passkey verification
+        kdfAlgorithm: user.keyMaterial.kdfAlgorithm,
+        kdfSalt: user.keyMaterial.kdfSalt,
+        kdfIterations: user.keyMaterial.kdfIterations,
+        kdfMemoryKiB: user.keyMaterial.kdfMemoryKiB,
+        kdfParallelism: user.keyMaterial.kdfParallelism,
+        publicKeyJwk: JSON.parse(user.keyMaterial.publicKeyJwk),
+        publicKeyFingerprint: user.keyMaterial.publicKeyFingerprint,
+      });
+    }
+
     const km = user.keyMaterial;
     const fingerprint = km.publicKeyFingerprint;
     const sessionToken = issueSessionToken(user.id);
@@ -97,6 +135,7 @@ export async function POST(req: NextRequest) {
       sessionToken,
       expiresAt,
       isDecoy: false,
+      passkeyRequired: false,
     });
   }
 
@@ -120,5 +159,6 @@ export async function POST(req: NextRequest) {
     sessionToken: null,
     expiresAt: null,
     isDecoy: true,
+    passkeyRequired: false,
   });
 }
