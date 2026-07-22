@@ -1,0 +1,4 @@
+﻿{
+  "version": "5.2",
+  "migration_name": "20260722085325_add_apikey_deadman_metrics"
+}
