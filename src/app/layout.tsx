@@ -14,17 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 /**
- * Módulo 4 (noindex, nofollow): el vault NO debe ser indexable por
- * buscadores. Esto evita que aparezca en Google/Bing y reduzca la
- * superficie de exposición pública del producto.
- *
- * Módulo 1 (CSP estricta): Content-Security-Policy que bloquea:
- *  - inline scripts (solo nonces)
- *  - inline styles (Next.js los necesita → 'unsafe-inline' para styles)
- *  - eval (forbidden)
- *  - frame-ancestors 'none' (anti-clickjacking)
- *  - connect-src solo a self (no exfiltración a dominios externos)
- *  - form-action solo a self
+ * Módulo 1 (CSP): se maneja en middleware.ts con nonces dinámicos.
+ * Módulo 4 (noindex, nofollow): el vault NO debe ser indexable.
+ * translate=no global: evita Google Translate en formularios sensibles.
  */
 export const metadata: Metadata = {
   title: "Zero-Knowledge Vault — Gestor de Contraseñas para Equipos",
@@ -70,23 +62,9 @@ export const metadata: Metadata = {
     description:
       "Gestor de contraseñas Zero-Knowledge con cifrado end-to-end en el navegador.",
   },
-  // Módulo 1: Content-Security-Policy estricta como meta tag.
-  // Los headers HTTP en next.config.ts son la fuente de verdad, pero el
-  // meta tag refuerza la política en rendered HTML.
-  other: {
-    "content-security-policy": [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob:",
-      "font-src 'self' data:",
-      "connect-src 'self' https://api.github.com",
-      "frame-ancestors 'none'",
-      "form-action 'self'",
-      "base-uri 'self'",
-      "object-src 'none'",
-    ].join("; "),
-  },
+  // CSP se configura dinámicamente en middleware.ts con nonces.
+  // Ver src/middleware.ts para la política completa.
+  other: {},
 };
 
 export const viewport: Viewport = {
