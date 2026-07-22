@@ -1,17 +1,60 @@
-/**
- * Sentry SDK integration. Requires SENTRY_DSN env var.
- * To activate: set SENTRY_DSN in Vercel env vars.
- */
-export const SENTRY_DSN = process.env.SENTRY_DSN ?? null;
-export function initSentry(): boolean {
-  if (!SENTRY_DSN) {
-    console.warn("[sentry] SENTRY_DSN not set — error reporting disabled");
-    return false;
+import * as Sentry from "@sentry/nextjs";
+import { logger } from "./logger";
+
+const hasDsn = !!(process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN);
+
+export function captureException(error: unknown, context?: Record<string, unknown>): void {
+  if (hasDsn) {
+    Sentry.captureException(error, { extra: context });
+  } else {
+    logger.error({ err: error, context }, "[sentry fallback] no DSN configured");
   }
-  console.log("[sentry] Initialized with DSN:", SENTRY_DSN.slice(0, 16) + "...");
-  return true;
 }
-export function captureException(error: Error | unknown, context?: Record<string, unknown>): void {
-  if (SENTRY_DSN) console.error("[sentry]", error, context);
-  else console.error("[error]", error);
+
+export function captureMessage(message: string, level: "info" | "warning" | "error" = "info", context?: Record<string, unknown>): void {
+  if (hasDsn) {
+    Sentry.captureMessage(message, { level, extra: context });
+  } else {
+    logger[level === "error" ? "error" : level === "warning" ? "warn" : "info"]({ context }, `[sentry fallback] ${message}`);
+  }
 }
+
+export function setUser(user: { id: string; email?: string } | null): void {
+  if (hasDsn) {
+    Sentry.setUser(user ?? null);
+  }
+}
+
+export function setTag(key: string, value: string): void {
+  if (hasDsn) {
+    Sentry.setTag(key, value);
+  }
+}
+
+export function setExtra(key: string, value: unknown): void {
+  if (hasDsn) {
+    Sentry.setExtra(key, value);
+  }
+}
+
+export function addBreadcrumb(breadcrumb: { message: string; category?: string; level?: "info" | "warning" | "error" }): void {
+  if (hasDsn) {
+    Sentry.addBreadcrumb(breadcrumb);
+  }
+}
+
+export function startSpan<T>(name: string, fn: () => T): T {
+  if (hasDsn) {
+    return Sentry.startSpan({ name }, () => fn());
+  }
+  return fn();
+}
+
+export function wrapApiHandlerWithSentry<T extends (...args: unknown[]) => unknown>(handler: T, parameterizedRoute: string): T {
+  if (hasDsn) {
+    return Sentry.wrapApiHandlerWithSentry(handler, parameterizedRoute) as unknown as T;
+  }
+  return handler;
+}
+
+export { hasDsn };
