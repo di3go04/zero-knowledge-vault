@@ -161,3 +161,24 @@ model AuditLog {
   @@index([userId, createdAt])
   @@index([eventCategory])
 }
+
+// ---------------------------------------------------------------------
+// API Key: para acceso programático (integración third-party, CI/CD).
+// Solo se almacena el hash SHA-256 de la key, nunca la key en texto
+// plano. La key raw se devuelve UNA sola vez en la creación.
+// ---------------------------------------------------------------------
+model ApiKey {
+  id          String   @id @default(cuid())
+  userId      String
+  keyPrefix   String   // primeros 8 chars de la key raw (para identificar la key)
+  keyHash     String   @unique // SHA-256 de la key raw
+  name        String   // nombre descriptivo
+  scopes      String   // JSON array: ["read:secrets", "write:secrets"]
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  createdAt   DateTime @default(now())
+  revokedAt   DateTime?
+
+  @@index([userId])
+  @@index([keyHash])
+}
