@@ -1,6 +1,8 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, beforeAll } from "vitest";
 import { incrementRequestCount, getRequestCount, getMetrics } from "../metrics-store";
 import { db } from "../db";
+
+const hasRedis = !!process.env.REDIS_URL;
 
 describe("MetricsStore", () => {
   beforeEach(async () => {
@@ -34,15 +36,23 @@ describe("MetricsStore", () => {
 
     const metrics = await getMetrics();
     expect(metrics.request_count).toBeGreaterThanOrEqual(3);
-    // active_connections puede ser null si no hay Redis — no debería fallar
     expect(metrics).toHaveProperty("request_count");
   });
 
-  it("persiste en DB (no es variable en memoria)", async () => {
-    await incrementRequestCount();
+  it("persiste correctamente (no es variable en memoria)", async () => {
+    const v = await incrementRequestCount();
 
-    const fromDb = await db.metric.findUnique({ where: { name: "request_count" } });
-    expect(fromDb).not.toBeNull();
-    expect(fromDb!.value).toBeGreaterThanOrEqual(1);
+    if (hasRedis) {
+      const { default: Redis } = await import("ioredis");
+      const redis = new Redis(process.env.REDIS_URL!);
+      const fromRedis = await redis.get("metrics:request_count");
+      expect(fromRedis).not.toBeNull();
+      expect(parseInt(fromRedis!, 10)).toBe(v);
+      await redis.quit();
+    } else {
+      const fromDb = await db.metric.findUnique({ where: { name: "request_count" } });
+      expect(fromDb).not.toBeNull();
+      expect(fromDb!.value).toBe(v);
+    }
   });
 });

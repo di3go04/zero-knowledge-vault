@@ -15,7 +15,7 @@ generator client {
 // Y configurar DATABASE_URL en el formato:
 //   postgresql://user:password@host:5432/dbname?schema=public
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 

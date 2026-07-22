@@ -43,6 +43,10 @@ db/*.db
 db/*.db-journal
 db/*.sqlite
 db/*.sqlite-journal
+prisma/db/*.db
+prisma/db/*.db-journal
+prisma/db/*.sqlite
+prisma/db/*.sqlite-journal
 
 # TypeScript build cache
 *.tsbuildinfo
